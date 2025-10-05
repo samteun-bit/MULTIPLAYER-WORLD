@@ -483,6 +483,19 @@ class Game {
   }
 
   updateGameState(players) {
+    // Create a set of player IDs from server state
+    const serverPlayerIds = new Set(players.map(p => p.id));
+
+    // Remove players that are no longer in server state
+    this.players.forEach((mesh, playerId) => {
+      if (!serverPlayerIds.has(playerId)) {
+        console.log('🧹 Cleaning up disappeared player:', playerId);
+        this.removePlayerMesh(playerId);
+        ui.removePlayer(playerId);
+      }
+    });
+
+    // Update existing players
     players.forEach(playerData => {
       const mesh = this.players.get(playerData.id);
       if (mesh) {
