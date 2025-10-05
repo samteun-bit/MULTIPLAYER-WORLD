@@ -43,7 +43,12 @@ class GameClient {
               position: { ...myPlayer.position },
               velocity: { x: 0, y: 0, z: 0 },
               rotation: myPlayer.rotation,
-              isGrounded: true
+              isGrounded: true,
+              jumpCount: 0,
+              isDashing: false,
+              dashTimer: 0,
+              dashCooldownTimer: 0,
+              dashDirection: { x: 0, z: 0 }
             };
             console.log('✅ CLIENT: Local player state initialized for prediction', this.localPlayer);
           } else {
@@ -122,6 +127,18 @@ class GameClient {
   }
 
   updateLocalPlayer(input, dt) {
+    // Update dash cooldown
+    if (this.localPlayer.dashCooldownTimer > 0) {
+      this.localPlayer.dashCooldownTimer = Math.max(0, this.localPlayer.dashCooldownTimer - dt);
+    }
+
+    // Update dash timer
+    if (this.localPlayer.isDashing) {
+      this.localPlayer.dashTimer -= dt;
+      if (this.localPlayer.dashTimer <= 0) {
+        this.localPlayer.isDashing = false;
+      }
+    }
 
     // Same physics as server
     let moveX = 0;
@@ -144,14 +161,34 @@ class GameClient {
     const rotatedX = moveX * Math.cos(-yaw) - moveZ * Math.sin(-yaw);
     const rotatedZ = moveX * Math.sin(-yaw) + moveZ * Math.cos(-yaw);
 
-    // Apply movement
-    this.localPlayer.velocity.x = rotatedX * this.config.moveSpeed;
-    this.localPlayer.velocity.z = rotatedZ * this.config.moveSpeed;
+    // Dash
+    if (input.dash && !this.localPlayer.isDashing && this.localPlayer.dashCooldownTimer <= 0 && (rotatedX !== 0 || rotatedZ !== 0)) {
+      this.localPlayer.isDashing = true;
+      this.localPlayer.dashTimer = this.config.dashDuration;
+      this.localPlayer.dashCooldownTimer = this.config.dashCooldown;
+      this.localPlayer.dashDirection.x = rotatedX;
+      this.localPlayer.dashDirection.z = rotatedZ;
+    }
 
-    // Jump
-    if (input.jump && this.localPlayer.isGrounded) {
-      this.localPlayer.velocity.y = this.config.jumpPower;
-      this.localPlayer.isGrounded = false;
+    // Apply movement
+    if (this.localPlayer.isDashing) {
+      this.localPlayer.velocity.x = this.localPlayer.dashDirection.x * this.config.dashSpeed;
+      this.localPlayer.velocity.z = this.localPlayer.dashDirection.z * this.config.dashSpeed;
+    } else {
+      this.localPlayer.velocity.x = rotatedX * this.config.moveSpeed;
+      this.localPlayer.velocity.z = rotatedZ * this.config.moveSpeed;
+    }
+
+    // Double Jump
+    if (input.jump) {
+      if (this.localPlayer.isGrounded) {
+        this.localPlayer.velocity.y = this.config.jumpPower;
+        this.localPlayer.isGrounded = false;
+        this.localPlayer.jumpCount = 1;
+      } else if (this.localPlayer.jumpCount === 1) {
+        this.localPlayer.velocity.y = this.config.jumpPower;
+        this.localPlayer.jumpCount = 2;
+      }
     }
 
     // Gravity
@@ -169,6 +206,7 @@ class GameClient {
       this.localPlayer.position.y = this.config.groundLevel;
       this.localPlayer.velocity.y = 0;
       this.localPlayer.isGrounded = true;
+      this.localPlayer.jumpCount = 0;
     }
 
     // World boundaries

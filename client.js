@@ -22,7 +22,8 @@ class Game {
       backward: false,
       left: false,
       right: false,
-      jump: false
+      jump: false,
+      dash: false
     };
 
     // Camera
@@ -328,6 +329,12 @@ class Game {
         changed = true;
         event.preventDefault();
         break;
+      case 'ShiftLeft':
+      case 'ShiftRight':
+        this.keys.dash = true;
+        changed = true;
+        event.preventDefault();
+        break;
       case 'KeyP':
         this.cameraRotation.yaw -= Math.PI / 2;
         changed = true;
@@ -367,6 +374,11 @@ class Game {
         break;
       case 'Space':
         this.keys.jump = false;
+        changed = true;
+        break;
+      case 'ShiftLeft':
+      case 'ShiftRight':
+        this.keys.dash = false;
         changed = true;
         break;
     }
@@ -531,6 +543,23 @@ class Game {
     if (this.isHost && this.gameHost) {
       const players = this.gameHost.getPlayers();
       this.updateGameState(players);
+    }
+
+    // Update dash gauge
+    if (this.config) {
+      let dashCooldown = 0;
+
+      // Get dash cooldown from local player
+      if (this.isHost && this.gameHost) {
+        const hostPlayer = this.gameHost.players.get(this.localPlayerId);
+        if (hostPlayer) {
+          dashCooldown = hostPlayer.dashCooldownTimer;
+        }
+      } else if (this.gameClient && this.gameClient.localPlayer) {
+        dashCooldown = this.gameClient.localPlayer.dashCooldownTimer;
+      }
+
+      ui.updateDashGauge(dashCooldown, this.config.dashCooldown);
     }
 
     this.updateCamera();

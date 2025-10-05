@@ -168,6 +168,46 @@
       pointer-events: auto;
     }
 
+    /* Dash Gauge */
+    #dash-gauge {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px 15px;
+      border-radius: 8px;
+      pointer-events: auto;
+    }
+
+    #dash-gauge-label {
+      color: white;
+      font-size: 12px;
+      margin-bottom: 5px;
+      text-align: center;
+    }
+
+    #dash-gauge-container {
+      width: 150px;
+      height: 20px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      overflow: hidden;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+
+    #dash-gauge-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #00ffff, #0088ff);
+      border-radius: 8px;
+      transition: width 0.1s linear;
+      box-shadow: 0 0 10px rgba(0, 200, 255, 0.5);
+    }
+
+    #dash-gauge-fill.ready {
+      background: linear-gradient(90deg, #00ff88, #00ffff);
+      box-shadow: 0 0 15px rgba(0, 255, 200, 0.8);
+    }
+
     /* Loading Screen */
     #loading-screen {
       position: absolute;
@@ -247,6 +287,14 @@
       <div id="controls-panel">
         <h3>Controls</h3>
         <div id="controls-list"></div>
+      </div>
+
+      <!-- Dash Gauge -->
+      <div id="dash-gauge">
+        <div id="dash-gauge-label">Dash</div>
+        <div id="dash-gauge-container">
+          <div id="dash-gauge-fill" style="width: 100%;"></div>
+        </div>
       </div>
     </div>
 

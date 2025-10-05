@@ -12,7 +12,10 @@ class GameHost {
       jumpPower: 8,
       gravity: 20,
       groundLevel: 0.5,
-      worldSize: 50
+      worldSize: 50,
+      dashSpeed: 20,
+      dashDuration: 0.15,
+      dashCooldown: 1.5
     };
 
     this.lastUpdate = Date.now();
@@ -87,7 +90,12 @@ class GameHost {
       velocity: { x: 0, y: 0, z: 0 },
       rotation: 0,
       color: this.randomColor(),
-      isGrounded: true
+      isGrounded: true,
+      jumpCount: 0,
+      isDashing: false,
+      dashTimer: 0,
+      dashCooldownTimer: 0,
+      dashDirection: { x: 0, z: 0 }
     };
 
     this.players.set(peerId, player);
@@ -97,6 +105,7 @@ class GameHost {
       left: false,
       right: false,
       jump: false,
+      dash: false,
       cameraYaw: 0
     });
 
@@ -165,6 +174,19 @@ class GameHost {
       const input = this.inputs.get(peerId);
       if (!input) return;
 
+      // Update dash cooldown
+      if (player.dashCooldownTimer > 0) {
+        player.dashCooldownTimer = Math.max(0, player.dashCooldownTimer - dt);
+      }
+
+      // Update dash timer
+      if (player.isDashing) {
+        player.dashTimer -= dt;
+        if (player.dashTimer <= 0) {
+          player.isDashing = false;
+        }
+      }
+
       // Calculate movement
       let moveX = 0;
       let moveZ = 0;
@@ -186,14 +208,34 @@ class GameHost {
       const rotatedX = moveX * Math.cos(-yaw) - moveZ * Math.sin(-yaw);
       const rotatedZ = moveX * Math.sin(-yaw) + moveZ * Math.cos(-yaw);
 
-      // Apply movement
-      player.velocity.x = rotatedX * this.config.moveSpeed;
-      player.velocity.z = rotatedZ * this.config.moveSpeed;
+      // Dash
+      if (input.dash && !player.isDashing && player.dashCooldownTimer <= 0 && (rotatedX !== 0 || rotatedZ !== 0)) {
+        player.isDashing = true;
+        player.dashTimer = this.config.dashDuration;
+        player.dashCooldownTimer = this.config.dashCooldown;
+        player.dashDirection.x = rotatedX;
+        player.dashDirection.z = rotatedZ;
+      }
 
-      // Jump
-      if (input.jump && player.isGrounded) {
-        player.velocity.y = this.config.jumpPower;
-        player.isGrounded = false;
+      // Apply movement
+      if (player.isDashing) {
+        player.velocity.x = player.dashDirection.x * this.config.dashSpeed;
+        player.velocity.z = player.dashDirection.z * this.config.dashSpeed;
+      } else {
+        player.velocity.x = rotatedX * this.config.moveSpeed;
+        player.velocity.z = rotatedZ * this.config.moveSpeed;
+      }
+
+      // Double Jump
+      if (input.jump) {
+        if (player.isGrounded) {
+          player.velocity.y = this.config.jumpPower;
+          player.isGrounded = false;
+          player.jumpCount = 1;
+        } else if (player.jumpCount === 1) {
+          player.velocity.y = this.config.jumpPower;
+          player.jumpCount = 2;
+        }
       }
 
       // Gravity
@@ -211,6 +253,7 @@ class GameHost {
         player.position.y = this.config.groundLevel;
         player.velocity.y = 0;
         player.isGrounded = true;
+        player.jumpCount = 0;
       }
 
       // World boundaries
@@ -232,7 +275,8 @@ class GameHost {
         name: p.name,
         position: p.position,
         rotation: p.rotation,
-        color: p.color
+        color: p.color,
+        dashCooldownTimer: p.dashCooldownTimer
       }))
     });
   }

@@ -9,6 +9,7 @@ class UIManager {
     this.playerListContent = document.getElementById('player-list-content');
     this.controlsList = document.getElementById('controls-list');
     this.fpsCounter = document.getElementById('fps-counter');
+    this.dashGaugeFill = document.getElementById('dash-gauge-fill');
 
     // State
     this.players = new Map();
@@ -143,6 +144,19 @@ class UIManager {
     setTimeout(() => {
       errorDiv.remove();
     }, 5000);
+  }
+
+  // Update dash gauge
+  updateDashGauge(cooldownTimer, maxCooldown) {
+    const percentage = Math.max(0, Math.min(100, ((maxCooldown - cooldownTimer) / maxCooldown) * 100));
+    this.dashGaugeFill.style.width = `${percentage}%`;
+
+    // Change appearance when ready
+    if (percentage >= 100) {
+      this.dashGaugeFill.classList.add('ready');
+    } else {
+      this.dashGaugeFill.classList.remove('ready');
+    }
   }
 }
 
