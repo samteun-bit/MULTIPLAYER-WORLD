@@ -599,16 +599,23 @@ class Game {
     const desiredY = localPlayer.position.y + height;
     const desiredZ = localPlayer.position.z + offsetZ;
 
-    // Use faster lerp for Y to reduce bounce/shake when jumping
-    this.cameraPosition.x += (desiredX - this.cameraPosition.x) * 0.1;
-    this.cameraPosition.y += (desiredY - this.cameraPosition.y) * 0.3; // Faster Y response
-    this.cameraPosition.z += (desiredZ - this.cameraPosition.z) * 0.1;
+    // Smooth camera movement - all axes use same smooth lerp
+    const smoothness = 0.15; // Lower = smoother (less shake)
+    this.cameraPosition.x += (desiredX - this.cameraPosition.x) * smoothness;
+    this.cameraPosition.y += (desiredY - this.cameraPosition.y) * smoothness;
+    this.cameraPosition.z += (desiredZ - this.cameraPosition.z) * smoothness;
 
     this.camera.position.copy(this.cameraPosition);
 
-    this.cameraTarget.x = localPlayer.position.x;
-    this.cameraTarget.y = localPlayer.position.y + 0.5;
-    this.cameraTarget.z = localPlayer.position.z;
+    // Smooth look-at target as well
+    const targetX = localPlayer.position.x;
+    const targetY = localPlayer.position.y + 0.5;
+    const targetZ = localPlayer.position.z;
+
+    this.cameraTarget.x += (targetX - this.cameraTarget.x) * smoothness;
+    this.cameraTarget.y += (targetY - this.cameraTarget.y) * smoothness;
+    this.cameraTarget.z += (targetZ - this.cameraTarget.z) * smoothness;
+
     this.camera.lookAt(this.cameraTarget);
   }
 
