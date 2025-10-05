@@ -247,6 +247,18 @@ class Game {
       if (!this.gameHost) return;
 
       const players = this.gameHost.getPlayers();
+      const serverPlayerIds = new Set(players.map(p => p.id));
+
+      // Remove players that are no longer in game state
+      this.players.forEach((mesh, playerId) => {
+        if (!serverPlayerIds.has(playerId)) {
+          console.log('🧹 HOST: Cleaning up disappeared player:', playerId);
+          this.removePlayerMesh(playerId);
+          ui.removePlayer(playerId);
+        }
+      });
+
+      // Add or update existing players
       players.forEach(player => {
         if (!this.players.has(player.id)) {
           console.log('🆕 New player detected, creating mesh:', player.id);
@@ -265,6 +277,7 @@ class Game {
     }, 100);
 
     this.network.onDisconnect((peerId) => {
+      console.log('🔌 HOST: onDisconnect triggered for:', peerId);
       this.removePlayerMesh(peerId);
       ui.removePlayer(peerId);
     });
@@ -296,6 +309,7 @@ class Game {
     });
 
     this.gameClient.onPlayerLeft((playerId) => {
+      console.log('🔌 CLIENT: onPlayerLeft triggered for:', playerId);
       this.removePlayerMesh(playerId);
       ui.removePlayer(playerId);
     });
@@ -479,6 +493,9 @@ class Game {
       this.players.delete(playerId);
 
       console.log('🗑️ Removed player mesh:', playerId);
+      console.log('📊 Remaining players:', this.players.size);
+    } else {
+      console.log('⚠️ Tried to remove non-existent player:', playerId);
     }
   }
 

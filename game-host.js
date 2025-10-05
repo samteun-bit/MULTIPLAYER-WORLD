@@ -149,14 +149,19 @@ class GameHost {
   }
 
   removePlayer(peerId) {
+    console.log('🗑️ HOST: Removing player:', peerId);
+
     this.players.delete(peerId);
     this.inputs.delete(peerId);
 
-    // Broadcast to all clients
-    this.network.send({
+    // Broadcast to all clients (including self as host)
+    const removeMessage = {
       type: 'playerLeft',
       playerId: peerId
-    });
+    };
+
+    console.log('📢 HOST: Broadcasting player removal:', removeMessage);
+    this.network.send(removeMessage);
   }
 
   updateInput(inputData) {
