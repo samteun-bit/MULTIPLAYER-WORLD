@@ -16,10 +16,6 @@ class NetworkManager {
       onDisconnect: null,
       onData: null
     };
-
-    // Firebase (for room management)
-    this.db = null;
-    this.roomRef = null;
   }
 
   // Initialize PeerJS
