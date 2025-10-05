@@ -392,19 +392,22 @@ class Game {
       playerData.position.z
     );
 
-    // Create name tag sprite
+    // Create name tag sprite (transparent background)
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     canvas.width = 256;
     canvas.height = 64;
 
-    context.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
+    // Add text shadow for better visibility
     context.font = 'Bold 32px Arial';
-    context.fillStyle = 'white';
+    context.fillStyle = 'black';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
+    // Draw shadow (offset)
+    context.fillText(playerData.name || playerData.id.substring(0, 8), canvas.width / 2 + 2, canvas.height / 2 + 2);
+
+    // Draw white text on top
+    context.fillStyle = 'white';
     context.fillText(playerData.name || playerData.id.substring(0, 8), canvas.width / 2, canvas.height / 2);
 
     const texture = new THREE.CanvasTexture(canvas);
