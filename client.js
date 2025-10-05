@@ -494,8 +494,9 @@ class Game {
     const desiredY = localPlayer.position.y + height;
     const desiredZ = localPlayer.position.z + offsetZ;
 
+    // Use faster lerp for Y to reduce bounce/shake when jumping
     this.cameraPosition.x += (desiredX - this.cameraPosition.x) * 0.1;
-    this.cameraPosition.y += (desiredY - this.cameraPosition.y) * 0.1;
+    this.cameraPosition.y += (desiredY - this.cameraPosition.y) * 0.3; // Faster Y response
     this.cameraPosition.z += (desiredZ - this.cameraPosition.z) * 0.1;
 
     this.camera.position.copy(this.cameraPosition);

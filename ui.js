@@ -80,7 +80,7 @@ class UIManager {
       playerItem.className = 'player-item';
 
       const isLocalPlayer = player.id === this.localPlayerId;
-      const playerName = isLocalPlayer ? 'You' : `Player ${player.id.substring(0, 6)}`;
+      const playerName = isLocalPlayer ? (player.name || 'You') : (player.name || `Player ${player.id.substring(0, 6)}`);
 
       playerItem.innerHTML = `
         <div class="player-color" style="background-color: #${player.color.toString(16).padStart(6, '0')}"></div>
