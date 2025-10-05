@@ -50,6 +50,16 @@ class GameClient {
               dashCooldownTimer: 0,
               dashDirection: { x: 0, z: 0 }
             };
+            this.lastInput = {
+              forward: false,
+              backward: false,
+              left: false,
+              right: false,
+              jump: false,
+              jumpPressed: false,
+              dash: false,
+              cameraYaw: 0
+            };
             console.log('✅ CLIENT: Local player state initialized for prediction', this.localPlayer);
           } else {
             console.error('❌ CLIENT: Could not find my player in init data!');
@@ -179,16 +189,20 @@ class GameClient {
       this.localPlayer.velocity.z = rotatedZ * this.config.moveSpeed;
     }
 
-    // Double Jump
-    if (input.jump) {
+    // Double Jump - trigger on key press (not hold)
+    if (input.jump && !input.jumpPressed) {
       if (this.localPlayer.isGrounded) {
         this.localPlayer.velocity.y = this.config.jumpPower;
         this.localPlayer.isGrounded = false;
         this.localPlayer.jumpCount = 1;
+        input.jumpPressed = true;
       } else if (this.localPlayer.jumpCount === 1) {
         this.localPlayer.velocity.y = this.config.jumpPower;
         this.localPlayer.jumpCount = 2;
+        input.jumpPressed = true;
       }
+    } else if (!input.jump) {
+      input.jumpPressed = false;
     }
 
     // Gravity

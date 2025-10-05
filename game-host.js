@@ -105,6 +105,7 @@ class GameHost {
       left: false,
       right: false,
       jump: false,
+      jumpPressed: false,
       dash: false,
       cameraYaw: 0
     });
@@ -226,16 +227,20 @@ class GameHost {
         player.velocity.z = rotatedZ * this.config.moveSpeed;
       }
 
-      // Double Jump
-      if (input.jump) {
+      // Double Jump - trigger on key press (not hold)
+      if (input.jump && !input.jumpPressed) {
         if (player.isGrounded) {
           player.velocity.y = this.config.jumpPower;
           player.isGrounded = false;
           player.jumpCount = 1;
+          input.jumpPressed = true;
         } else if (player.jumpCount === 1) {
           player.velocity.y = this.config.jumpPower;
           player.jumpCount = 2;
+          input.jumpPressed = true;
         }
+      } else if (!input.jump) {
+        input.jumpPressed = false;
       }
 
       // Gravity
