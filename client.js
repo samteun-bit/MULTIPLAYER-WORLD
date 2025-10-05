@@ -533,13 +533,13 @@ class Game {
 
         // Smooth interpolation for remote players
         // Lower lerp = smoother, but slightly more delayed
-        const lerpFactor = 0.3;
+        const lerpFactor = 0.2; // Reduced for smoother movement
 
         mesh.position.x += (playerData.position.x - mesh.position.x) * lerpFactor;
         mesh.position.y += (playerData.position.y - mesh.position.y) * lerpFactor;
         mesh.position.z += (playerData.position.z - mesh.position.z) * lerpFactor;
 
-        // Smooth rotation
+        // Smooth rotation with slower interpolation
         let targetRotation = playerData.rotation;
         let currentRotation = mesh.rotation.y;
 
@@ -548,7 +548,8 @@ class Game {
         if (diff > Math.PI) diff -= 2 * Math.PI;
         if (diff < -Math.PI) diff += 2 * Math.PI;
 
-        mesh.rotation.y += diff * lerpFactor;
+        // Use even slower rotation for smoothness
+        mesh.rotation.y += diff * (lerpFactor * 0.8);
       }
     });
   }
