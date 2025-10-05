@@ -1,104 +1,92 @@
-// Client game logic - receives game state from host
+// Client game logic - receives state from host and sends input
 class GameClient {
   constructor(network) {
     this.network = network;
-
-    // Game state
     this.players = [];
     this.localPlayerId = null;
     this.config = null;
 
-    // Input state
-    this.keys = {
-      forward: false,
-      backward: false,
-      left: false,
-      right: false,
-      jump: false,
-      cameraYaw: 0
+    // Callbacks
+    this.callbacks = {
+      onInit: null,
+      onGameState: null,
+      onPlayerJoined: null,
+      onPlayerLeft: null
     };
 
-    this.setupNetworkHandlers();
+    this.setupNetworking();
   }
 
-  setupNetworkHandlers() {
-    // Receive initial game state from host
-    this.network.onInit((data) => {
-      console.log('Client: Received init', data);
-      this.localPlayerId = data.localPlayerId;
-      this.config = data.config;
-      this.players = data.players;
+  setupNetworking() {
+    this.network.onData((peerId, data) => {
+      console.log('📦 CLIENT: Received data:', data.type, data);
+      switch (data.type) {
+        case 'init':
+          console.log('🎮 CLIENT: Received init data', data);
+          this.localPlayerId = data.localPlayerId;
+          this.config = data.config;
+          this.players = data.players;
+          console.log('📋 CLIENT: Players from init:', this.players);
+          if (this.callbacks.onInit) {
+            console.log('✅ CLIENT: Calling onInit callback');
+            this.callbacks.onInit({
+              localPlayerId: data.localPlayerId,
+              config: data.config,
+              players: data.players
+            });
+          } else {
+            console.log('❌ CLIENT: No onInit callback set!');
+          }
+          break;
 
-      if (this.onInitCallback) {
-        this.onInitCallback(data);
-      }
-    });
+        case 'gameState':
+          this.players = data.players;
+          if (this.callbacks.onGameState) {
+            this.callbacks.onGameState(data.players);
+          }
+          break;
 
-    // Receive game state updates
-    this.network.onGameState((gameState) => {
-      this.players = gameState;
+        case 'playerJoined':
+          console.log('🎮 CLIENT: Player joined:', data.player.id);
+          if (this.callbacks.onPlayerJoined) {
+            this.callbacks.onPlayerJoined(data.player);
+          }
+          break;
 
-      if (this.onGameStateCallback) {
-        this.onGameStateCallback(gameState);
-      }
-    });
-
-    // Receive player joined notification
-    this.network.onPlayerJoined((player) => {
-      console.log('Client: Player joined', player);
-
-      if (this.onPlayerJoinedCallback) {
-        this.onPlayerJoinedCallback(player);
-      }
-    });
-
-    // Receive player left notification
-    this.network.onPlayerLeft((playerId) => {
-      console.log('Client: Player left', playerId);
-
-      if (this.onPlayerLeftCallback) {
-        this.onPlayerLeftCallback(playerId);
+        case 'playerLeft':
+          console.log('🎮 CLIENT: Player left:', data.playerId);
+          if (this.callbacks.onPlayerLeft) {
+            this.callbacks.onPlayerLeft(data.playerId);
+          }
+          break;
       }
     });
   }
 
-  // Start client
-  start() {
-    console.log('Client: Started');
-  }
+  sendInput(input) {
+    // Store input for potential client-side prediction
+    this.lastInput = input;
 
-  // Update input
-  updateInput(inputData) {
-    Object.assign(this.keys, inputData);
-
-    // Send input to host
-    this.network.send('input', this.keys);
-  }
-
-  // Get current game state for rendering
-  getGameState() {
-    return this.players;
+    this.network.send({
+      type: 'input',
+      input: input
+    });
   }
 
   // Set callbacks
   onInit(callback) {
-    this.onInitCallback = callback;
+    this.callbacks.onInit = callback;
   }
 
   onGameState(callback) {
-    this.onGameStateCallback = callback;
+    this.callbacks.onGameState = callback;
   }
 
   onPlayerJoined(callback) {
-    this.onPlayerJoinedCallback = callback;
+    this.callbacks.onPlayerJoined = callback;
   }
 
   onPlayerLeft(callback) {
-    this.onPlayerLeftCallback = callback;
-  }
-
-  // Stop client
-  stop() {
-    this.players = [];
+    this.callbacks.onPlayerLeft = callback;
   }
 }

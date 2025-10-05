@@ -1,55 +1,44 @@
 const express = require('express');
 const http = require('http');
-const { ExpressPeerServer } = require('peer');
+const { Server } = require('socket.io');
 const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-
-const PORT = process.env.PORT || 3000;
-
-// Create PeerJS server for WebRTC signaling
-const peerServer = ExpressPeerServer(server, {
-  debug: true,
-  path: '/peerjs'
-});
-
-app.use('/peerjs', peerServer);
-
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Room management
-const rooms = new Map(); // roomId -> { hostId, players: Set<peerId> }
-
-// Simple signaling for room management
-const io = require('socket.io')(server, {
+const io = new Server(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"]
   }
 });
 
+const PORT = process.env.PORT || 3000;
+
+// Serve static files
+app.use(express.static(__dirname));
+
+// Room management
+const rooms = new Map(); // roomId -> { hostId, players: Set<socketId> }
+
 io.on('connection', (socket) => {
-  console.log('Client connected for signaling:', socket.id);
+  console.log('✅ Client connected:', socket.id);
 
   // Create a new room
   socket.on('createRoom', (data, callback) => {
     const roomId = generateRoomId();
     rooms.set(roomId, {
-      hostId: data.peerId,
-      hostName: data.playerName || 'Host',
-      players: new Set([data.peerId]),
-      maxPlayers: 8
+      hostId: socket.id,
+      players: new Set([socket.id])
     });
 
-    console.log(`Room created: ${roomId} by ${data.peerId}`);
+    socket.join(roomId);
+    console.log(`🏠 Room created: ${roomId} by ${socket.id}`);
     callback({ success: true, roomId });
   });
 
   // Join an existing room
   socket.on('joinRoom', (data, callback) => {
-    const { roomId, peerId, playerName } = data;
+    const { roomId } = data;
     const room = rooms.get(roomId);
 
     if (!room) {
@@ -57,68 +46,83 @@ io.on('connection', (socket) => {
       return;
     }
 
-    if (room.players.size >= room.maxPlayers) {
-      callback({ success: false, error: 'Room is full' });
-      return;
-    }
+    room.players.add(socket.id);
+    socket.join(roomId);
+    console.log(`✅ Player ${socket.id} joined room ${roomId}`);
 
-    room.players.add(peerId);
-    console.log(`Player ${peerId} joined room ${roomId}`);
+    // Notify host that player joined
+    socket.to(room.hostId).emit('playerJoined', { peerId: socket.id });
 
-    // Notify the host about new player
-    io.emit('playerJoinedRoom', { roomId, peerId, playerName });
+    callback({ success: true });
+  });
 
-    callback({
-      success: true,
-      hostId: room.hostId,
-      playerCount: room.players.size
+  // Broadcast data to all players in room
+  socket.on('broadcast', (data) => {
+    const { roomId, payload } = data;
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    // Send to all other players in room
+    socket.to(roomId).emit('gameData', {
+      from: socket.id,
+      type: payload.type,
+      payload: payload
+    });
+  });
+
+  // Send data to specific peer
+  socket.on('sendToPeer', (data) => {
+    const { peerId, payload } = data;
+
+    console.log(`📤 Sending from ${socket.id} to ${peerId}:`, payload.type);
+    io.to(peerId).emit('gameData', {
+      from: socket.id,
+      type: payload.type,
+      payload: payload
     });
   });
 
   // Leave room
   socket.on('leaveRoom', (data) => {
-    const { roomId, peerId } = data;
-    const room = rooms.get(roomId);
-
-    if (room) {
-      room.players.delete(peerId);
-
-      // If host left, close the room
-      if (peerId === room.hostId) {
-        io.emit('roomClosed', { roomId });
-        rooms.delete(roomId);
-        console.log(`Room ${roomId} closed (host left)`);
-      } else {
-        io.emit('playerLeftRoom', { roomId, peerId });
-        console.log(`Player ${peerId} left room ${roomId}`);
-      }
-
-      // Delete empty rooms
-      if (room.players.size === 0) {
-        rooms.delete(roomId);
-      }
-    }
+    const { roomId } = data;
+    handleLeaveRoom(socket, roomId);
   });
 
-  // Get room info
-  socket.on('getRoomInfo', (roomId, callback) => {
-    const room = rooms.get(roomId);
-    if (room) {
-      callback({
-        success: true,
-        hostId: room.hostId,
-        playerCount: room.players.size,
-        maxPlayers: room.maxPlayers
-      });
-    } else {
-      callback({ success: false, error: 'Room not found' });
-    }
-  });
-
+  // Handle disconnect
   socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
+    console.log('❌ Client disconnected:', socket.id);
+
+    // Find and leave all rooms
+    rooms.forEach((room, roomId) => {
+      if (room.players.has(socket.id)) {
+        handleLeaveRoom(socket, roomId);
+      }
+    });
   });
 });
+
+function handleLeaveRoom(socket, roomId) {
+  const room = rooms.get(roomId);
+  if (!room) return;
+
+  room.players.delete(socket.id);
+
+  // If host left, close the room
+  if (socket.id === room.hostId) {
+    socket.to(roomId).emit('roomClosed', { roomId });
+    rooms.delete(roomId);
+    console.log(`🏠 Room ${roomId} closed (host left)`);
+  } else {
+    // Notify host that player left
+    socket.to(room.hostId).emit('playerLeft', { peerId: socket.id });
+    console.log(`👋 Player ${socket.id} left room ${roomId}`);
+  }
+
+  // Delete empty rooms
+  if (room.players.size === 0) {
+    rooms.delete(roomId);
+  }
+}
 
 // Helper function to generate room IDs
 function generateRoomId() {
@@ -127,6 +131,5 @@ function generateRoomId() {
 
 // Start server
 server.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`PeerJS server running on /peerjs`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });

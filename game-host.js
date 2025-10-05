@@ -1,86 +1,86 @@
-// Host game logic - runs game simulation and broadcasts state to clients
+// Host game logic - runs the authoritative game simulation
 class GameHost {
   constructor(network) {
     this.network = network;
+    this.players = new Map(); // peerId -> player state
+    this.inputs = new Map(); // peerId -> current input
 
-    // Game state
-    this.players = new Map(); // peerId -> player data
-    this.inputs = new Map(); // peerId -> current inputs
-
-    // Game configuration
+    // Game config
     this.config = {
       moveSpeed: 5,
       jumpPower: 8,
       gravity: 20,
       groundLevel: 0.5,
-      playerSize: 1,
       worldSize: 50
     };
 
-    // Game loop
-    this.lastUpdateTime = Date.now();
-    this.gameLoopInterval = null;
+    this.lastUpdate = Date.now();
+    this.updateInterval = null;
 
-    this.setupNetworkHandlers();
+    // Callback for rendering
+    this.onPlayerAddedCallback = null;
+
+    this.setupNetworking();
   }
 
-  setupNetworkHandlers() {
-    // Handle new player joining
-    this.network.onPlayerJoined((peerId) => {
-      console.log('Host: Player joined', peerId);
+  setupNetworking() {
+    // When a client connects
+    this.network.onConnect((peerId) => {
+      console.log('🎮 HOST: Player connected:', peerId);
       this.addPlayer(peerId);
     });
 
-    // Handle player leaving
-    this.network.onPlayerLeft((peerId) => {
-      console.log('Host: Player left', peerId);
+    // When a client disconnects
+    this.network.onDisconnect((peerId) => {
+      console.log('🎮 HOST: Player disconnected:', peerId);
       this.removePlayer(peerId);
     });
 
-    // Handle player input
-    this.network.onInput((peerId, inputData) => {
-      const playerInputs = this.inputs.get(peerId);
-      if (playerInputs) {
-        Object.assign(playerInputs, inputData);
+    // When receiving data from clients
+    this.network.onData((peerId, data) => {
+      if (data.type === 'input') {
+        // Update player input
+        const input = this.inputs.get(peerId);
+        if (input) {
+          Object.assign(input, data.input);
+        }
       }
     });
   }
 
-  // Start hosting
   start() {
+    console.log('🎮 HOST: Starting game');
+
     // Add host player
     this.addPlayer(this.network.peerId);
 
-    // Start game loop
-    const TICK_RATE = 30;
-    const TICK_INTERVAL = 1000 / TICK_RATE;
-
-    this.gameLoopInterval = setInterval(() => {
+    // Start game loop (60 FPS for smoother updates)
+    this.updateInterval = setInterval(() => {
       this.update();
-    }, TICK_INTERVAL);
+    }, 1000 / 60);
 
-    console.log('Host: Game loop started');
+    console.log('🎮 HOST: Game loop running at 60 FPS');
 
-    // Return initial game state
     return {
+      localPlayerId: this.network.peerId,
       config: this.config,
-      players: Array.from(this.players.values()),
-      localPlayerId: this.network.peerId
+      players: Array.from(this.players.values())
     };
   }
 
-  // Add new player
   addPlayer(peerId) {
-    const newPlayer = {
+    console.log('➕ Adding player:', peerId);
+
+    const player = {
       id: peerId,
       position: { x: 0, y: this.config.groundLevel, z: 0 },
       velocity: { x: 0, y: 0, z: 0 },
       rotation: 0,
-      color: this.getRandomColor(),
+      color: this.randomColor(),
       isGrounded: true
     };
 
-    this.players.set(peerId, newPlayer);
+    this.players.set(peerId, player);
     this.inputs.set(peerId, {
       forward: false,
       backward: false,
@@ -90,50 +90,72 @@ class GameHost {
       cameraYaw: 0
     });
 
-    // Send init data to the new player (if not host)
-    if (peerId !== this.network.peerId) {
-      this.network.sendToPeer(peerId, 'init', {
-        config: this.config,
-        players: Array.from(this.players.values()),
-        localPlayerId: peerId
-      });
+    console.log('📊 Total players now:', this.players.size);
 
-      // Notify all other clients about the new player
-      this.network.send('playerJoined', newPlayer);
+    // Send initial state to the new player (if not host)
+    if (peerId !== this.network.peerId) {
+      const initData = {
+        type: 'init',
+        localPlayerId: peerId,
+        config: this.config,
+        players: Array.from(this.players.values())
+      };
+      console.log('📤 HOST: Sending init data to', peerId, initData);
+      this.network.sendTo(peerId, initData);
+
+      // Broadcast to all clients that a new player joined
+      const joinData = {
+        type: 'playerJoined',
+        player: player
+      };
+      console.log('📢 HOST: Broadcasting player joined:', joinData);
+      this.network.send(joinData);
     }
 
-    return newPlayer;
+    // Notify client.js for rendering
+    if (this.onPlayerAddedCallback) {
+      console.log('🎨 Calling render callback for player:', peerId);
+      this.onPlayerAddedCallback(player);
+    }
+
+    return player;
   }
 
-  // Remove player
+  // Set callback for when players are added
+  onPlayerAdded(callback) {
+    this.onPlayerAddedCallback = callback;
+  }
+
   removePlayer(peerId) {
     this.players.delete(peerId);
     this.inputs.delete(peerId);
 
-    // Notify all clients
-    this.network.send('playerLeft', peerId);
+    // Broadcast to all clients
+    this.network.send({
+      type: 'playerLeft',
+      playerId: peerId
+    });
   }
 
-  // Update local player input (host's own input)
-  updateLocalInput(inputData) {
-    const localInputs = this.inputs.get(this.network.peerId);
-    if (localInputs) {
-      Object.assign(localInputs, inputData);
+  updateInput(inputData) {
+    // Update host's own input
+    const input = this.inputs.get(this.network.peerId);
+    if (input) {
+      Object.assign(input, inputData);
     }
   }
 
-  // Game update loop
   update() {
     const now = Date.now();
-    const deltaTime = (now - this.lastUpdateTime) / 1000;
-    this.lastUpdateTime = now;
+    const dt = (now - this.lastUpdate) / 1000;
+    this.lastUpdate = now;
 
     // Update all players
     this.players.forEach((player, peerId) => {
       const input = this.inputs.get(peerId);
       if (!input) return;
 
-      // Calculate movement direction (local space)
+      // Calculate movement
       let moveX = 0;
       let moveZ = 0;
 
@@ -142,37 +164,37 @@ class GameHost {
       if (input.left) moveX -= 1;
       if (input.right) moveX += 1;
 
-      // Normalize diagonal movement
+      // Normalize
       const length = Math.sqrt(moveX * moveX + moveZ * moveZ);
       if (length > 0) {
         moveX /= length;
         moveZ /= length;
       }
 
-      // Rotate movement direction based on camera yaw
-      const cameraYaw = input.cameraYaw || 0;
-      const rotatedX = moveX * Math.cos(-cameraYaw) - moveZ * Math.sin(-cameraYaw);
-      const rotatedZ = moveX * Math.sin(-cameraYaw) + moveZ * Math.cos(-cameraYaw);
+      // Rotate by camera yaw
+      const yaw = input.cameraYaw || 0;
+      const rotatedX = moveX * Math.cos(-yaw) - moveZ * Math.sin(-yaw);
+      const rotatedZ = moveX * Math.sin(-yaw) + moveZ * Math.cos(-yaw);
 
       // Apply movement
       player.velocity.x = rotatedX * this.config.moveSpeed;
       player.velocity.z = rotatedZ * this.config.moveSpeed;
 
-      // Handle jumping
+      // Jump
       if (input.jump && player.isGrounded) {
         player.velocity.y = this.config.jumpPower;
         player.isGrounded = false;
       }
 
-      // Apply gravity
+      // Gravity
       if (!player.isGrounded) {
-        player.velocity.y -= this.config.gravity * deltaTime;
+        player.velocity.y -= this.config.gravity * dt;
       }
 
       // Update position
-      player.position.x += player.velocity.x * deltaTime;
-      player.position.y += player.velocity.y * deltaTime;
-      player.position.z += player.velocity.z * deltaTime;
+      player.position.x += player.velocity.x * dt;
+      player.position.y += player.velocity.y * dt;
+      player.position.z += player.velocity.z * dt;
 
       // Ground collision
       if (player.position.y <= this.config.groundLevel) {
@@ -182,45 +204,41 @@ class GameHost {
       }
 
       // World boundaries
-      const halfWorld = this.config.worldSize / 2;
-      player.position.x = Math.max(-halfWorld, Math.min(halfWorld, player.position.x));
-      player.position.z = Math.max(-halfWorld, Math.min(halfWorld, player.position.z));
+      const half = this.config.worldSize / 2;
+      player.position.x = Math.max(-half, Math.min(half, player.position.x));
+      player.position.z = Math.max(-half, Math.min(half, player.position.z));
 
-      // Update rotation based on movement
+      // Update rotation
       if (rotatedX !== 0 || rotatedZ !== 0) {
         player.rotation = Math.atan2(rotatedX, rotatedZ);
       }
     });
 
-    // Broadcast game state to all clients
-    const gameState = Array.from(this.players.values()).map(player => ({
-      id: player.id,
-      position: player.position,
-      rotation: player.rotation,
-      color: player.color
-    }));
-
-    this.network.send('gameState', gameState);
+    // Broadcast game state
+    this.network.send({
+      type: 'gameState',
+      players: Array.from(this.players.values()).map(p => ({
+        id: p.id,
+        position: p.position,
+        rotation: p.rotation,
+        color: p.color
+      }))
+    });
   }
 
-  // Stop hosting
-  stop() {
-    if (this.gameLoopInterval) {
-      clearInterval(this.gameLoopInterval);
-      this.gameLoopInterval = null;
-    }
+  getPlayers() {
+    return Array.from(this.players.values());
+  }
 
+  stop() {
+    if (this.updateInterval) {
+      clearInterval(this.updateInterval);
+    }
     this.players.clear();
     this.inputs.clear();
   }
 
-  // Get current game state for rendering
-  getGameState() {
-    return Array.from(this.players.values());
-  }
-
-  // Helper function
-  getRandomColor() {
+  randomColor() {
     const colors = [
       0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff,
       0x00ffff, 0xff8800, 0x8800ff, 0x00ff88, 0xff0088

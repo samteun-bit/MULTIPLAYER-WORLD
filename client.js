@@ -1,4 +1,4 @@
-// Main client application - integrates networking, game logic, and rendering
+// Main client application
 class Game {
   constructor() {
     this.scene = null;
@@ -10,14 +10,13 @@ class Game {
     this.gameHost = null;
     this.gameClient = null;
     this.isHost = false;
-    this.roomId = null;
 
     // Game state
-    this.players = new Map(); // playerId -> mesh
+    this.players = new Map(); // playerId -> THREE.Mesh
     this.localPlayerId = null;
-    this.gameConfig = null;
+    this.config = null;
 
-    // Input state
+    // Input
     this.keys = {
       forward: false,
       backward: false,
@@ -29,14 +28,7 @@ class Game {
     // Camera
     this.cameraPosition = new THREE.Vector3();
     this.cameraTarget = new THREE.Vector3();
-    this.cameraRotation = {
-      yaw: 0,
-      pitch: 0
-    };
-
-    // UI Elements
-    this.roomMenu = document.getElementById('room-menu');
-    this.loadingScreen = document.getElementById('loading-screen');
+    this.cameraRotation = { yaw: 0, pitch: 0 };
 
     this.init();
   }
@@ -44,26 +36,17 @@ class Game {
   async init() {
     this.setupThreeJS();
     this.setupControls();
-    this.setupRoomMenu();
+    this.setupUI();
 
-    // Initialize networking
     try {
       this.network = new NetworkManager();
+      await this.network.init();
 
-      // Update loading text
-      const loadingText = this.loadingScreen.querySelector('h2');
-      loadingText.textContent = 'Connecting to PeerJS server...';
-
-      await this.network.initialize();
-
-      // Show room menu
-      this.loadingScreen.classList.add('hidden');
-      this.roomMenu.style.display = 'block';
+      document.getElementById('loading-screen').classList.add('hidden');
+      document.getElementById('room-menu').style.display = 'block';
     } catch (error) {
-      console.error('Failed to initialize networking:', error);
-      this.loadingScreen.classList.add('hidden');
-      this.roomMenu.style.display = 'block';
-      this.showError(error.message || 'Failed to connect to PeerJS server. Please refresh and try again.');
+      console.error('Failed to initialize:', error);
+      alert('Failed to connect: ' + error.message);
     }
   }
 
@@ -82,58 +65,33 @@ class Game {
       CONFIG.camera.far
     );
     this.camera.position.set(0, CONFIG.camera.offsetY, CONFIG.camera.offsetZ);
-    this.camera.lookAt(0, 0, 0);
 
     // Renderer
-    this.renderer = new THREE.WebGLRenderer({ antialias: CONFIG.renderer.antialias });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(window.devicePixelRatio);
     container.appendChild(this.renderer.domElement);
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(
-      CONFIG.lighting.ambient.color,
-      CONFIG.lighting.ambient.intensity
-    );
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     this.scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(
-      CONFIG.lighting.directional.color,
-      CONFIG.lighting.directional.intensity
-    );
-    directionalLight.position.set(
-      CONFIG.lighting.directional.position.x,
-      CONFIG.lighting.directional.position.y,
-      CONFIG.lighting.directional.position.z
-    );
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.4);
+    directionalLight.position.set(10, 20, 10);
     this.scene.add(directionalLight);
 
     // Ground
-    const groundGeometry = new THREE.PlaneGeometry(
-      CONFIG.world.groundSize,
-      CONFIG.world.groundSize
-    );
-    const groundMaterial = new THREE.MeshLambertMaterial({
-      color: CONFIG.world.groundColor
-    });
+    const groundGeometry = new THREE.PlaneGeometry(100, 100);
+    const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
-    ground.position.y = 0;
     this.scene.add(ground);
 
     // Grid
-    const gridHelper = new THREE.GridHelper(
-      CONFIG.world.gridSize,
-      CONFIG.world.gridDivisions,
-      0x444444,
-      0x222222
-    );
-    this.scene.add(gridHelper);
+    const grid = new THREE.GridHelper(100, 20);
+    this.scene.add(grid);
 
-    // Window resize
     window.addEventListener('resize', () => this.onWindowResize());
-
-    // Start render loop
     this.animate();
   }
 
@@ -142,155 +100,156 @@ class Game {
     window.addEventListener('keyup', (e) => this.onKeyUp(e));
   }
 
-  setupRoomMenu() {
+  setupUI() {
     const btnHost = document.getElementById('btn-host');
     const btnJoin = document.getElementById('btn-join');
     const btnJoinRoom = document.getElementById('btn-join-room');
     const btnBack = document.getElementById('btn-back');
     const btnStartGame = document.getElementById('btn-start-game');
     const btnCopyCode = document.getElementById('btn-copy-code');
-    const joinRoomForm = document.getElementById('join-room-form');
-    const roomInfo = document.getElementById('room-info');
-    const roomIdInput = document.getElementById('room-id-input');
-    const errorMessage = document.getElementById('error-message');
 
-    btnHost.addEventListener('click', async () => {
-      try {
-        btnHost.disabled = true;
-        btnJoin.disabled = true;
-
-        this.roomId = await this.network.createRoom('Host');
-        this.isHost = true;
-
-        // Show room code
-        document.getElementById('room-code').textContent = this.roomId;
-        btnHost.style.display = 'none';
-        btnJoin.style.display = 'none';
-        roomInfo.style.display = 'block';
-
-        console.log('Room created:', this.roomId);
-      } catch (error) {
-        console.error('Failed to create room:', error);
-        this.showError('Failed to create room');
-        btnHost.disabled = false;
-        btnJoin.disabled = false;
-      }
-    });
-
-    btnJoin.addEventListener('click', () => {
-      btnHost.style.display = 'none';
-      btnJoin.style.display = 'none';
-      joinRoomForm.style.display = 'block';
-    });
-
-    btnBack.addEventListener('click', () => {
-      joinRoomForm.style.display = 'none';
-      btnHost.style.display = 'block';
-      btnJoin.style.display = 'block';
-      roomIdInput.value = '';
-      errorMessage.style.display = 'none';
-    });
-
-    btnJoinRoom.addEventListener('click', async () => {
-      const hostPeerId = roomIdInput.value.trim();
-      if (!hostPeerId) {
-        this.showError('Please enter host Peer ID');
-        return;
-      }
-
-      try {
-        btnJoinRoom.disabled = true;
-        await this.network.joinRoom(hostPeerId, 'Player');
-        this.isHost = false;
-
-        // Start game as client
-        this.startGameAsClient();
-      } catch (error) {
-        console.error('Failed to join room:', error);
-        this.showError(error.message);
-        btnJoinRoom.disabled = false;
-      }
-    });
-
-    btnStartGame.addEventListener('click', () => {
-      this.startGameAsHost();
-    });
-
-    btnCopyCode.addEventListener('click', () => {
-      navigator.clipboard.writeText(this.roomId);
-      const originalText = btnCopyCode.textContent;
-      btnCopyCode.textContent = 'Copied!';
-      setTimeout(() => {
-        btnCopyCode.textContent = originalText;
-      }, 2000);
-    });
+    btnHost.addEventListener('click', () => this.onHostClick());
+    btnJoin.addEventListener('click', () => this.onJoinClick());
+    btnBack.addEventListener('click', () => this.onBackClick());
+    btnJoinRoom.addEventListener('click', () => this.onJoinRoomClick());
+    btnStartGame.addEventListener('click', () => this.onStartGameClick());
+    btnCopyCode.addEventListener('click', () => this.onCopyCodeClick());
   }
 
-  showError(message) {
-    const errorMessage = document.getElementById('error-message');
-    errorMessage.textContent = message;
-    errorMessage.style.display = 'block';
-    setTimeout(() => {
-      errorMessage.style.display = 'none';
-    }, 3000);
-  }
+  async onHostClick() {
+    try {
+      const roomId = await this.network.createRoom();
+      document.getElementById('room-code').textContent = roomId;
 
-  startGameAsHost() {
-    console.log('Starting game as host');
-    this.roomMenu.style.display = 'none';
+      document.getElementById('btn-host').style.display = 'none';
+      document.getElementById('btn-join').style.display = 'none';
+      document.getElementById('room-info').style.display = 'block';
 
-    // Initialize game host
-    this.gameHost = new GameHost(this.network);
-    const initData = this.gameHost.start();
+      this.isHost = true;
 
-    this.localPlayerId = this.network.peerId;
-    this.gameConfig = initData.config;
+      // Create game host IMMEDIATELY when hosting starts
+      console.log('🎮 Creating GameHost immediately on host click');
+      this.gameHost = new GameHost(this.network);
 
-    // Initialize UI
-    ui.setLocalPlayerId(this.localPlayerId);
-    initData.players.forEach(player => {
-      this.createPlayer(player);
-      ui.updatePlayer(player);
-    });
-
-    // Setup callbacks for new players
-    this.network.onPlayerJoined((peerId) => {
-      const players = this.gameHost.getGameState();
-      const newPlayer = players.find(p => p.id === peerId);
-      if (newPlayer) {
-        this.createPlayer(newPlayer);
-        ui.updatePlayer(newPlayer);
-      }
-    });
-
-    this.network.onPlayerLeft((peerId) => {
-      this.removePlayer(peerId);
-      ui.removePlayer(peerId);
-    });
-
-    ui.updateConnectionStatus(true);
-  }
-
-  startGameAsClient() {
-    console.log('Starting game as client');
-    this.roomMenu.style.display = 'none';
-
-    // Initialize game client
-    this.gameClient = new GameClient(this.network);
-
-    this.gameClient.onInit((data) => {
-      console.log('Client initialized', data);
-      this.localPlayerId = data.localPlayerId;
-      this.gameConfig = data.config;
-
-      ui.setLocalPlayerId(this.localPlayerId);
-
-      data.players.forEach(player => {
-        this.createPlayer(player);
+      // Set callback for when players are added
+      this.gameHost.onPlayerAdded((player) => {
+        console.log('🎨 Rendering new player:', player.id);
+        this.createPlayerMesh(player);
         ui.updatePlayer(player);
       });
 
+      // Setup disconnect handler
+      this.network.onDisconnect((peerId) => {
+        this.removePlayerMesh(peerId);
+        ui.removePlayer(peerId);
+      });
+    } catch (error) {
+      console.error('Failed to create room:', error);
+      alert('Failed to create room: ' + error.message);
+    }
+  }
+
+  onJoinClick() {
+    document.getElementById('btn-host').style.display = 'none';
+    document.getElementById('btn-join').style.display = 'none';
+    document.getElementById('join-room-form').style.display = 'block';
+  }
+
+  onBackClick() {
+    document.getElementById('join-room-form').style.display = 'none';
+    document.getElementById('btn-host').style.display = 'block';
+    document.getElementById('btn-join').style.display = 'block';
+    document.getElementById('room-id-input').value = '';
+  }
+
+  async onJoinRoomClick() {
+    const hostPeerId = document.getElementById('room-id-input').value.trim();
+    if (!hostPeerId) {
+      alert('Please enter host Peer ID');
+      return;
+    }
+
+    try {
+      document.getElementById('btn-join-room').disabled = true;
+      document.getElementById('btn-join-room').textContent = 'Connecting...';
+
+      // Setup client FIRST - before connecting
+      console.log('🔧 Creating GameClient');
+      this.gameClient = new GameClient(this.network);
+      console.log('🔧 Setting up callbacks BEFORE connecting');
+      this.setupClientCallbacks();
+
+      console.log('🔗 Now connecting to host...');
+      await this.network.joinRoom(hostPeerId);
+
+      console.log('✅ Connection complete, hiding menu');
+      document.getElementById('room-menu').style.display = 'none';
       ui.updateConnectionStatus(true);
+
+    } catch (error) {
+      console.error('Failed to join:', error);
+      alert('Failed to join: ' + error.message);
+      document.getElementById('btn-join-room').disabled = false;
+      document.getElementById('btn-join-room').textContent = 'Join';
+    }
+  }
+
+  onStartGameClick() {
+    console.log('🎮 Starting game as host');
+
+    if (!this.gameHost) {
+      console.error('❌ GameHost not created! This should not happen.');
+      return;
+    }
+
+    const initData = this.gameHost.start();
+
+    this.localPlayerId = initData.localPlayerId;
+    this.config = initData.config;
+    ui.setLocalPlayerId(this.localPlayerId);
+
+    document.getElementById('room-menu').style.display = 'none';
+    ui.updateConnectionStatus(true);
+  }
+
+  setupHostCallbacks() {
+    // DON'T set onConnect here - game-host.js already handles it
+    // We just need to listen for when players are added to render them
+
+    // Poll for new players
+    setInterval(() => {
+      if (!this.gameHost) return;
+
+      const players = this.gameHost.getPlayers();
+      players.forEach(player => {
+        if (!this.players.has(player.id)) {
+          console.log('🆕 New player detected, creating mesh:', player.id);
+          this.createPlayerMesh(player);
+          ui.updatePlayer(player);
+        }
+      });
+    }, 100);
+
+    this.network.onDisconnect((peerId) => {
+      this.removePlayerMesh(peerId);
+      ui.removePlayer(peerId);
+    });
+  }
+
+  setupClientCallbacks() {
+    console.log('🔧 Setting up client callbacks');
+    this.gameClient.onInit((data) => {
+      console.log('🎮 Client initialized', data);
+      this.localPlayerId = data.localPlayerId;
+      this.config = data.config;
+
+      ui.setLocalPlayerId(this.localPlayerId);
+      console.log('👥 Creating player meshes for:', data.players.length, 'players');
+      data.players.forEach(player => {
+        console.log('Creating mesh for player:', player.id);
+        this.createPlayerMesh(player);
+        ui.updatePlayer(player);
+      });
     });
 
     this.gameClient.onGameState((players) => {
@@ -298,16 +257,25 @@ class Game {
     });
 
     this.gameClient.onPlayerJoined((player) => {
-      this.createPlayer(player);
+      this.createPlayerMesh(player);
       ui.updatePlayer(player);
     });
 
     this.gameClient.onPlayerLeft((playerId) => {
-      this.removePlayer(playerId);
+      this.removePlayerMesh(playerId);
       ui.removePlayer(playerId);
     });
+  }
 
-    this.gameClient.start();
+  onCopyCodeClick() {
+    const code = document.getElementById('room-code').textContent;
+    navigator.clipboard.writeText(code);
+    const btn = document.getElementById('btn-copy-code');
+    const originalText = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => {
+      btn.textContent = originalText;
+    }, 2000);
   }
 
   onKeyDown(event) {
@@ -384,114 +352,120 @@ class Game {
   }
 
   sendInput() {
-    const inputData = {
+    const input = {
       ...this.keys,
       cameraYaw: this.cameraRotation.yaw
     };
 
     if (this.isHost && this.gameHost) {
-      this.gameHost.updateLocalInput(inputData);
+      this.gameHost.updateInput(input);
     } else if (this.gameClient) {
-      this.gameClient.updateInput(inputData);
+      this.gameClient.sendInput(input);
     }
   }
 
-  createPlayer(playerData) {
+  createPlayerMesh(playerData) {
     if (this.players.has(playerData.id)) return;
 
-    const geometry = new THREE.BoxGeometry(
-      CONFIG.player.size,
-      CONFIG.player.size,
-      CONFIG.player.size
-    );
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
     const material = new THREE.MeshLambertMaterial({ color: playerData.color });
-    const cube = new THREE.Mesh(geometry, material);
+    const mesh = new THREE.Mesh(geometry, material);
 
-    cube.position.set(
+    mesh.position.set(
       playerData.position.x,
       playerData.position.y,
       playerData.position.z
     );
 
-    this.scene.add(cube);
-    this.players.set(playerData.id, cube);
+    this.scene.add(mesh);
+    this.players.set(playerData.id, mesh);
+
+    console.log('✅ Created player mesh:', playerData.id);
   }
 
-  removePlayer(playerId) {
-    const player = this.players.get(playerId);
-    if (player) {
-      this.scene.remove(player);
-      player.geometry.dispose();
-      player.material.dispose();
+  removePlayerMesh(playerId) {
+    const mesh = this.players.get(playerId);
+    if (mesh) {
+      this.scene.remove(mesh);
+      mesh.geometry.dispose();
+      mesh.material.dispose();
       this.players.delete(playerId);
     }
   }
 
   updateGameState(players) {
     players.forEach(playerData => {
-      const player = this.players.get(playerData.id);
-      if (player) {
-        player.position.set(
-          playerData.position.x,
-          playerData.position.y,
-          playerData.position.z
-        );
-        player.rotation.y = playerData.rotation;
-      }
-    });
-
-    // Update host's own player rendering
-    if (this.isHost && this.gameHost) {
-      const hostPlayers = this.gameHost.getGameState();
-      hostPlayers.forEach(playerData => {
-        const player = this.players.get(playerData.id);
-        if (player) {
-          player.position.set(
+      const mesh = this.players.get(playerData.id);
+      if (mesh) {
+        // Skip interpolation for local player (instant update)
+        if (playerData.id === this.localPlayerId) {
+          mesh.position.set(
             playerData.position.x,
             playerData.position.y,
             playerData.position.z
           );
-          player.rotation.y = playerData.rotation;
+          mesh.rotation.y = playerData.rotation;
+          return;
         }
-      });
-    }
+
+        // Smooth interpolation for remote players
+        const lerpFactor = 0.5; // Increased for faster response
+
+        mesh.position.x += (playerData.position.x - mesh.position.x) * lerpFactor;
+        mesh.position.y += (playerData.position.y - mesh.position.y) * lerpFactor;
+        mesh.position.z += (playerData.position.z - mesh.position.z) * lerpFactor;
+
+        // Smooth rotation
+        let targetRotation = playerData.rotation;
+        let currentRotation = mesh.rotation.y;
+
+        // Handle rotation wrapping
+        let diff = targetRotation - currentRotation;
+        if (diff > Math.PI) diff -= 2 * Math.PI;
+        if (diff < -Math.PI) diff += 2 * Math.PI;
+
+        mesh.rotation.y += diff * lerpFactor;
+      }
+    });
   }
 
   updateCamera() {
     const localPlayer = this.players.get(this.localPlayerId);
     if (!localPlayer) return;
 
-    const playerPos = localPlayer.position;
-
     const distance = CONFIG.camera.offsetZ;
     const height = CONFIG.camera.offsetY;
 
-    const offsetX = distance * Math.sin(this.cameraRotation.yaw) * Math.cos(this.cameraRotation.pitch);
-    const offsetY = height + distance * Math.sin(this.cameraRotation.pitch);
-    const offsetZ = distance * Math.cos(this.cameraRotation.yaw) * Math.cos(this.cameraRotation.pitch);
+    const offsetX = distance * Math.sin(this.cameraRotation.yaw);
+    const offsetZ = distance * Math.cos(this.cameraRotation.yaw);
 
-    const desiredCameraX = playerPos.x + offsetX;
-    const desiredCameraY = playerPos.y + offsetY;
-    const desiredCameraZ = playerPos.z + offsetZ;
+    const desiredX = localPlayer.position.x + offsetX;
+    const desiredY = localPlayer.position.y + height;
+    const desiredZ = localPlayer.position.z + offsetZ;
 
-    this.cameraPosition.x += (desiredCameraX - this.cameraPosition.x) * CONFIG.player.cameraSmoothing;
-    this.cameraPosition.y += (desiredCameraY - this.cameraPosition.y) * CONFIG.player.cameraSmoothing;
-    this.cameraPosition.z += (desiredCameraZ - this.cameraPosition.z) * CONFIG.player.cameraSmoothing;
+    this.cameraPosition.x += (desiredX - this.cameraPosition.x) * 0.1;
+    this.cameraPosition.y += (desiredY - this.cameraPosition.y) * 0.1;
+    this.cameraPosition.z += (desiredZ - this.cameraPosition.z) * 0.1;
 
     this.camera.position.copy(this.cameraPosition);
 
-    this.cameraTarget.x = playerPos.x;
-    this.cameraTarget.y = playerPos.y + CONFIG.camera.lookAtOffsetY;
-    this.cameraTarget.z = playerPos.z;
+    this.cameraTarget.x = localPlayer.position.x;
+    this.cameraTarget.y = localPlayer.position.y + 0.5;
+    this.cameraTarget.z = localPlayer.position.z;
     this.camera.lookAt(this.cameraTarget);
   }
 
   animate() {
     requestAnimationFrame(() => this.animate());
 
+    // Host: update positions from game simulation
+    if (this.isHost && this.gameHost) {
+      const players = this.gameHost.getPlayers();
+      this.updateGameState(players);
+    }
+
     this.updateCamera();
     this.renderer.render(this.scene, this.camera);
-
     ui.updateFPS();
   }
 
@@ -502,7 +476,7 @@ class Game {
   }
 }
 
-// Start the game
+// Start game
 window.addEventListener('load', () => {
   new Game();
 });
