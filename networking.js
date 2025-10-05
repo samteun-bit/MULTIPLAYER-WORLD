@@ -97,45 +97,21 @@ class NetworkManager {
   // Create room (become host)
   async createRoom() {
     this.isHost = true;
-
-    // Generate 6-digit room code
-    this.roomId = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // Initialize Firebase
-    await this.initFirebase();
-
-    // Create room in Firebase
-    this.roomRef = firebase.database().ref('rooms/' + this.roomId);
-    await this.roomRef.set({
-      hostId: this.peerId,
-      createdAt: Date.now()
-    });
+    this.roomId = this.peerId; // Use Peer ID as room code
 
     console.log('🏠 Room created:', this.roomId);
     return this.roomId;
   }
 
   // Join room (become client)
-  async joinRoom(roomId) {
-    this.roomId = roomId;
+  async joinRoom(hostPeerId) {
+    this.roomId = hostPeerId;
     this.isHost = false;
 
-    // Initialize Firebase
-    await this.initFirebase();
-
-    // Get host ID from Firebase
-    const roomRef = firebase.database().ref('rooms/' + roomId);
-    const snapshot = await roomRef.once('value');
-
-    if (!snapshot.exists()) {
-      throw new Error('Room not found');
-    }
-
-    const hostId = snapshot.val().hostId;
-    console.log('🔗 Connecting to host:', hostId);
+    console.log('🔗 Connecting to host:', hostPeerId);
 
     // Connect to host with optimized DataChannel settings
-    const conn = this.peer.connect(hostId, {
+    const conn = this.peer.connect(hostPeerId, {
       reliable: false, // UDP-like behavior
       serialization: 'json'
     });
@@ -145,7 +121,7 @@ class NetworkManager {
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('Connection timeout'));
+        reject(new Error('Connection timeout - Host may be offline'));
       }, 10000);
 
       conn.on('open', () => {
@@ -159,23 +135,6 @@ class NetworkManager {
         reject(error);
       });
     });
-  }
-
-  // Initialize Firebase
-  async initFirebase() {
-    if (this.db) return; // Already initialized
-
-    // Firebase config (using public demo database)
-    const firebaseConfig = {
-      apiKey: "AIzaSyDummy_Demo_Key_For_Testing",
-      databaseURL: "https://multiplayer-game-demo-default-rtdb.firebaseio.com"
-    };
-
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
-
-    this.db = firebase.database();
   }
 
   // Send data to all clients (host only)
@@ -232,10 +191,6 @@ class NetworkManager {
 
   // Cleanup
   destroy() {
-    if (this.roomRef) {
-      this.roomRef.remove();
-    }
-
     this.connections.forEach(conn => conn.close());
     this.connections.clear();
 
