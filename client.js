@@ -72,10 +72,12 @@ class Game {
     );
     this.camera.position.set(0, CONFIG.camera.offsetY, CONFIG.camera.offsetZ);
 
-    // Renderer
+    // Renderer with shadow support
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(this.renderer.domElement);
 
     // Lights
@@ -84,13 +86,21 @@ class Game {
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.4);
     directionalLight.position.set(10, 20, 10);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.camera.left = -50;
+    directionalLight.shadow.camera.right = 50;
+    directionalLight.shadow.camera.top = 50;
+    directionalLight.shadow.camera.bottom = -50;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
     this.scene.add(directionalLight);
 
-    // Ground
+    // Ground with shadow receiving
     const groundGeometry = new THREE.PlaneGeometry(100, 100);
     const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
     this.scene.add(ground);
 
     // Grid
@@ -385,6 +395,10 @@ class Game {
     const geometry = new THREE.BoxGeometry(1, 1, 1);
     const material = new THREE.MeshLambertMaterial({ color: playerData.color });
     const mesh = new THREE.Mesh(geometry, material);
+
+    // Enable shadow casting
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
 
     mesh.position.set(
       playerData.position.x,
