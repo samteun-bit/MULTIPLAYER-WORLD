@@ -242,7 +242,7 @@ class Game {
     // DON'T set onConnect here - game-host.js already handles it
     // We just need to listen for when players are added to render them
 
-    // Poll for new players
+    // Poll for new players and update names
     setInterval(() => {
       if (!this.gameHost) return;
 
@@ -252,6 +252,14 @@ class Game {
           console.log('🆕 New player detected, creating mesh:', player.id);
           this.createPlayerMesh(player);
           ui.updatePlayer(player);
+        } else {
+          // Check if name changed
+          const mesh = this.players.get(player.id);
+          if (mesh && mesh.userData.playerName !== player.name) {
+            this.updatePlayerNameTag(mesh, player.name);
+            mesh.userData.playerName = player.name;
+            ui.updatePlayer(player);
+          }
         }
       });
     }, 100);
@@ -482,6 +490,8 @@ class Game {
         if (mesh.userData.playerName !== playerData.name) {
           this.updatePlayerNameTag(mesh, playerData.name);
           mesh.userData.playerName = playerData.name;
+          // Also update UI player list
+          ui.updatePlayer(playerData);
         }
 
         // For local player: use client-side predicted position
