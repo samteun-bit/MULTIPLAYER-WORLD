@@ -1,0 +1,22 @@
+{
+  "name": "multiplayerworld",
+  "version": "1.0.0",
+  "description": "Simple multiplayer web game with Three.js and Socket.IO",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "multiplayer",
+    "game",
+    "threejs",
+    "socketio"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.6.1"
+  }
+}
