@@ -54,12 +54,13 @@ class GameHost {
     // Add host player
     this.addPlayer(this.network.peerId);
 
-    // Start game loop (60 FPS for smoother updates)
+    // Start game loop at 20 Hz (20 updates/sec)
+    // This reduces network load significantly
     this.updateInterval = setInterval(() => {
       this.update();
-    }, 1000 / 60);
+    }, 1000 / 20);
 
-    console.log('🎮 HOST: Game loop running at 60 FPS');
+    console.log('🎮 HOST: Game loop running at 20 Hz (network updates)');
 
     return {
       localPlayerId: this.network.peerId,

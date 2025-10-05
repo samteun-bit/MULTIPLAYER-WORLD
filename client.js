@@ -422,7 +422,8 @@ class Game {
         }
 
         // Smooth interpolation for remote players
-        const lerpFactor = 0.2; // Slightly increased since local player is now instant
+        // Lower lerp = smoother, but slightly more delayed
+        const lerpFactor = 0.3;
 
         mesh.position.x += (playerData.position.x - mesh.position.x) * lerpFactor;
         mesh.position.y += (playerData.position.y - mesh.position.y) * lerpFactor;
