@@ -272,7 +272,8 @@
 
         <div id="join-room-form" style="display: none;">
           <h3 style="margin-bottom: 15px;">Join Room</h3>
-          <input type="text" id="room-id-input" placeholder="Enter Room Code" style="width: 100%; padding: 10px; font-size: 16px; border: 2px solid #444; border-radius: 6px; background: #222; color: white; margin-bottom: 10px;">
+          <input type="text" id="room-id-input" placeholder="Paste Host's Peer ID" style="width: 100%; padding: 10px; font-size: 14px; border: 2px solid #444; border-radius: 6px; background: #222; color: white; margin-bottom: 10px; font-family: monospace;">
+          <p style="font-size: 12px; color: #888; margin-bottom: 10px;">Ask the host for their Peer ID</p>
           <button id="btn-join-room" style="width: 100%; padding: 12px; font-size: 16px; background: #2196F3; color: white; border: none; border-radius: 6px; cursor: pointer; margin-bottom: 10px;">
             Join
           </button>
@@ -284,13 +285,13 @@
         <div id="room-info" style="display: none;">
           <h3 style="margin-bottom: 15px; text-align: center;">Room Created!</h3>
           <div style="background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 8px; margin-bottom: 15px;">
-            <p style="margin: 0 0 10px 0; font-size: 14px; color: #aaa;">Share this code:</p>
-            <div style="font-size: 32px; font-weight: bold; text-align: center; letter-spacing: 4px; margin-bottom: 10px;" id="room-code"></div>
+            <p style="margin: 0 0 10px 0; font-size: 14px; color: #aaa;">Share this Peer ID with your friends:</p>
+            <div style="font-size: 16px; font-weight: bold; text-align: center; margin-bottom: 10px; word-break: break-all; font-family: monospace; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px;" id="room-code"></div>
             <button id="btn-copy-code" style="width: 100%; padding: 10px; font-size: 14px; background: #555; color: white; border: none; border-radius: 6px; cursor: pointer;">
-              Copy Code
+              Copy Peer ID
             </button>
           </div>
-          <p style="text-align: center; color: #aaa; margin-bottom: 15px;">Waiting for players to join...</p>
+          <p style="text-align: center; color: #aaa; margin-bottom: 15px; font-size: 13px;">Players will connect when they paste your ID</p>
           <button id="btn-start-game" style="width: 100%; padding: 15px; font-size: 18px; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer;">
             Start Game
           </button>
@@ -307,10 +308,6 @@
 
   <!-- PeerJS from CDN -->
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-
-  <!-- Firebase from CDN -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
   <!-- Game files -->
   <script src="config.js"></script>

@@ -185,17 +185,16 @@ class Game {
     });
 
     btnJoinRoom.addEventListener('click', async () => {
-      const roomId = roomIdInput.value.trim().toUpperCase();
-      if (!roomId) {
-        this.showError('Please enter a room code');
+      const hostPeerId = roomIdInput.value.trim();
+      if (!hostPeerId) {
+        this.showError('Please enter host Peer ID');
         return;
       }
 
       try {
         btnJoinRoom.disabled = true;
-        await this.network.joinRoom(roomId, 'Player');
+        await this.network.joinRoom(hostPeerId, 'Player');
         this.isHost = false;
-        this.roomId = roomId;
 
         // Start game as client
         this.startGameAsClient();

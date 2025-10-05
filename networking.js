@@ -1,9 +1,8 @@
-// WebRTC Networking Manager using PeerJS (Serverless)
+// WebRTC Networking Manager using PeerJS (No Firebase - Direct Peer Connection)
 class NetworkManager {
   constructor() {
     this.peer = null;
     this.peerId = null;
-    this.roomId = null;
     this.isHost = false;
 
     // For host: connections to all clients
@@ -18,13 +17,9 @@ class NetworkManager {
     this.onGameStateCallback = null;
     this.onInputCallback = null;
     this.onInitCallback = null;
-
-    // Firebase reference (will be initialized later)
-    this.db = null;
-    this.roomRef = null;
   }
 
-  // Initialize PeerJS and Firebase
+  // Initialize PeerJS
   async initialize() {
     return new Promise((resolve, reject) => {
       // Connect to PeerJS cloud server
@@ -41,10 +36,6 @@ class NetworkManager {
       this.peer.on('open', (id) => {
         console.log('PeerJS connected with ID:', id);
         this.peerId = id;
-
-        // Initialize Firebase
-        this.initializeFirebase();
-
         resolve(id);
       });
 
@@ -64,117 +55,46 @@ class NetworkManager {
     });
   }
 
-  // Initialize Firebase Realtime Database
-  initializeFirebase() {
-    // Firebase config - using a public demo database for simplicity
-    // In production, you should create your own Firebase project
-    const firebaseConfig = {
-      apiKey: "AIzaSyDOCAbC123dEf456GhI789jKl01-MnO",
-      databaseURL: "https://multiplayer-world-default-rtdb.firebaseio.com",
-      projectId: "multiplayer-world"
-    };
-
-    // Initialize Firebase if not already initialized
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
-    this.db = firebase.database();
-  }
-
   // Create a new room (become host)
   async createRoom(playerName = 'Host') {
-    return new Promise(async (resolve, reject) => {
-      try {
-        this.roomId = this.generateRoomId();
-        this.isHost = true;
-
-        // Create room in Firebase
-        this.roomRef = this.db.ref('rooms/' + this.roomId);
-        await this.roomRef.set({
-          hostId: this.peerId,
-          hostName: playerName,
-          createdAt: Date.now(),
-          players: {
-            [this.peerId]: {
-              name: playerName,
-              joinedAt: Date.now()
-            }
-          }
-        });
-
-        // Listen for players joining
-        this.roomRef.child('players').on('child_added', (snapshot) => {
-          const playerId = snapshot.key;
-          if (playerId !== this.peerId) {
-            console.log('Player joined room:', playerId);
-          }
-        });
-
-        // Cleanup on disconnect
-        this.roomRef.onDisconnect().remove();
-
-        console.log('Room created:', this.roomId);
-        resolve(this.roomId);
-      } catch (error) {
-        reject(error);
-      }
+    return new Promise((resolve) => {
+      this.isHost = true;
+      console.log('Room created with Peer ID:', this.peerId);
+      // Return the peer ID as the room code
+      resolve(this.peerId);
     });
   }
 
   // Join an existing room (become client)
-  async joinRoom(roomId, playerName = 'Player') {
-    return new Promise(async (resolve, reject) => {
-      try {
-        this.roomId = roomId.toUpperCase();
-        this.isHost = false;
+  async joinRoom(hostPeerId, playerName = 'Player') {
+    return new Promise((resolve, reject) => {
+      this.isHost = false;
 
-        // Check if room exists
-        this.roomRef = this.db.ref('rooms/' + this.roomId);
-        const snapshot = await this.roomRef.once('value');
+      // Connect to host via WebRTC using the host's peer ID
+      console.log('Connecting to host:', hostPeerId);
+      this.hostConnection = this.peer.connect(hostPeerId, {
+        reliable: true
+      });
 
-        if (!snapshot.exists()) {
-          reject(new Error('Room not found'));
-          return;
+      this.setupConnection(this.hostConnection);
+
+      this.hostConnection.on('open', () => {
+        console.log('Connected to host');
+        resolve({ hostId: hostPeerId });
+      });
+
+      this.hostConnection.on('error', (error) => {
+        console.error('Connection error:', error);
+        reject(new Error('Failed to connect to host. Check the room code.'));
+      });
+
+      // Add timeout for connection
+      setTimeout(() => {
+        if (!this.hostConnection || !this.hostConnection.open) {
+          reject(new Error('Connection timeout. Host may be offline.'));
         }
-
-        const roomData = snapshot.val();
-        const hostId = roomData.hostId;
-
-        // Add self to room
-        await this.roomRef.child('players/' + this.peerId).set({
-          name: playerName,
-          joinedAt: Date.now()
-        });
-
-        // Remove self on disconnect
-        this.roomRef.child('players/' + this.peerId).onDisconnect().remove();
-
-        // Connect to host via WebRTC
-        console.log('Connecting to host:', hostId);
-        this.hostConnection = this.peer.connect(hostId, {
-          reliable: true
-        });
-
-        this.setupConnection(this.hostConnection);
-
-        this.hostConnection.on('open', () => {
-          console.log('Connected to host');
-          resolve({ hostId });
-        });
-
-        this.hostConnection.on('error', (error) => {
-          console.error('Connection error:', error);
-          reject(error);
-        });
-      } catch (error) {
-        reject(error);
-      }
+      }, 10000); // 10 second timeout
     });
-  }
-
-  // Generate room ID
-  generateRoomId() {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
   }
 
   // Setup connection event handlers
@@ -286,16 +206,6 @@ class NetworkManager {
 
   // Leave room and cleanup
   leaveRoom() {
-    // Remove from Firebase
-    if (this.roomRef && this.peerId) {
-      this.roomRef.child('players/' + this.peerId).remove();
-
-      if (this.isHost) {
-        // Remove entire room if host
-        this.roomRef.remove();
-      }
-    }
-
     // Close all connections
     if (this.isHost) {
       this.connections.forEach((conn) => conn.close());
@@ -305,7 +215,6 @@ class NetworkManager {
       this.hostConnection = null;
     }
 
-    this.roomId = null;
     this.isHost = false;
   }
 
