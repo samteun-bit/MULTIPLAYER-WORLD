@@ -49,6 +49,11 @@ class Game {
     // Initialize networking
     try {
       this.network = new NetworkManager();
+
+      // Update loading text
+      const loadingText = this.loadingScreen.querySelector('h2');
+      loadingText.textContent = 'Connecting to PeerJS server...';
+
       await this.network.initialize();
 
       // Show room menu
@@ -56,7 +61,9 @@ class Game {
       this.roomMenu.style.display = 'block';
     } catch (error) {
       console.error('Failed to initialize networking:', error);
-      ui.showError('Failed to connect to server');
+      this.loadingScreen.classList.add('hidden');
+      this.roomMenu.style.display = 'block';
+      this.showError(error.message || 'Failed to connect to PeerJS server. Please refresh and try again.');
     }
   }
 

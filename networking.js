@@ -22,27 +22,46 @@ class NetworkManager {
   // Initialize PeerJS
   async initialize() {
     return new Promise((resolve, reject) => {
-      // Connect to PeerJS cloud server
+      // Add timeout for initial connection
+      const timeout = setTimeout(() => {
+        reject(new Error('Connection timeout - PeerJS server not responding'));
+      }, 15000); // 15 second timeout
+
+      // Connect to PeerJS cloud server with multiple STUN servers
       this.peer = new Peer({
-        debug: 2,
+        debug: 1, // Reduce debug verbosity
         config: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' },
             { urls: 'stun:global.stun.twilio.com:3478' }
           ]
         }
       });
 
       this.peer.on('open', (id) => {
+        clearTimeout(timeout);
         console.log('PeerJS connected with ID:', id);
         this.peerId = id;
         resolve(id);
       });
 
       this.peer.on('error', (error) => {
+        clearTimeout(timeout);
         console.error('PeerJS error:', error);
-        // Don't reject on all errors, some are recoverable
-        if (error.type === 'unavailable-id' || error.type === 'network') {
+
+        // Handle different error types
+        if (error.type === 'unavailable-id') {
+          reject(new Error('Peer ID unavailable - please refresh'));
+        } else if (error.type === 'network') {
+          reject(new Error('Network error - check your internet connection'));
+        } else if (error.type === 'peer-unavailable') {
+          // Don't reject for peer-unavailable (happens when trying to connect to offline peer)
+          console.warn('Peer unavailable:', error);
+        } else {
           reject(error);
         }
       });
@@ -51,6 +70,12 @@ class NetworkManager {
       this.peer.on('connection', (conn) => {
         console.log('Incoming connection from:', conn.peer);
         this.setupConnection(conn);
+      });
+
+      // Handle disconnection
+      this.peer.on('disconnected', () => {
+        console.warn('Disconnected from PeerJS server, attempting to reconnect...');
+        // PeerJS will automatically attempt to reconnect
       });
     });
   }
