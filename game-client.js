@@ -95,11 +95,6 @@ class GameClient {
     // Store input for client-side prediction
     this.lastInput = input;
 
-    // Immediately update local player (client-side prediction)
-    if (this.localPlayer && this.config) {
-      this.updateLocalPlayer(input);
-    }
-
     // Send to server
     this.network.send({
       type: 'input',
@@ -109,16 +104,18 @@ class GameClient {
 
   startLocalUpdate() {
     // Update local player at 60 FPS for smooth prediction
+    this.lastUpdateTime = Date.now();
     setInterval(() => {
       if (this.lastInput && this.localPlayer && this.config) {
-        this.updateLocalPlayer(this.lastInput);
+        const now = Date.now();
+        const dt = (now - this.lastUpdateTime) / 1000;
+        this.lastUpdateTime = now;
+        this.updateLocalPlayer(this.lastInput, dt);
       }
     }, 1000 / 60);
   }
 
-  updateLocalPlayer(input) {
-    const dt = (Date.now() - this.lastUpdateTime) / 1000;
-    this.lastUpdateTime = Date.now();
+  updateLocalPlayer(input, dt) {
 
     // Same physics as server
     let moveX = 0;
