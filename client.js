@@ -397,8 +397,21 @@ class Game {
     players.forEach(playerData => {
       const mesh = this.players.get(playerData.id);
       if (mesh) {
-        // Skip interpolation for local player (instant update)
+        // For local player: use client-side predicted position
         if (playerData.id === this.localPlayerId) {
+          if (this.gameClient && this.gameClient.getLocalPlayerState) {
+            const localState = this.gameClient.getLocalPlayerState();
+            if (localState) {
+              mesh.position.set(
+                localState.position.x,
+                localState.position.y,
+                localState.position.z
+              );
+              mesh.rotation.y = localState.rotation;
+              return;
+            }
+          }
+          // Fallback to server state if prediction not available
           mesh.position.set(
             playerData.position.x,
             playerData.position.y,
@@ -409,7 +422,7 @@ class Game {
         }
 
         // Smooth interpolation for remote players
-        const lerpFactor = 0.5; // Increased for faster response
+        const lerpFactor = 0.2; // Slightly increased since local player is now instant
 
         mesh.position.x += (playerData.position.x - mesh.position.x) * lerpFactor;
         mesh.position.y += (playerData.position.y - mesh.position.y) * lerpFactor;
