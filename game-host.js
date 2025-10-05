@@ -1,7 +1,8 @@
 // Host game logic - runs the authoritative game simulation
 class GameHost {
-  constructor(network) {
+  constructor(network, hostName = 'Host') {
     this.network = network;
+    this.hostName = hostName;
     this.players = new Map(); // peerId -> player state
     this.inputs = new Map(); // peerId -> current input
 
@@ -44,6 +45,13 @@ class GameHost {
         if (input) {
           Object.assign(input, data.input);
         }
+      } else if (data.type === 'playerInfo') {
+        // Update player name
+        const player = this.players.get(peerId);
+        if (player) {
+          player.name = data.name;
+          console.log('📝 Updated player name:', peerId, data.name);
+        }
       }
     });
   }
@@ -74,6 +82,7 @@ class GameHost {
 
     const player = {
       id: peerId,
+      name: peerId === this.network.peerId ? this.hostName : 'Player',
       position: { x: 0, y: this.config.groundLevel, z: 0 },
       velocity: { x: 0, y: 0, z: 0 },
       rotation: 0,
@@ -220,6 +229,7 @@ class GameHost {
       type: 'gameState',
       players: Array.from(this.players.values()).map(p => ({
         id: p.id,
+        name: p.name,
         position: p.position,
         rotation: p.rotation,
         color: p.color

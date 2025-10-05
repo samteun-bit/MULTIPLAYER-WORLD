@@ -38,6 +38,12 @@ class Game {
     this.setupControls();
     this.setupUI();
 
+    // Load saved name
+    const savedName = localStorage.getItem('playerName');
+    if (savedName) {
+      document.getElementById('player-name-input').value = savedName;
+    }
+
     try {
       this.network = new NetworkManager();
       await this.network.init();
@@ -118,18 +124,23 @@ class Game {
 
   async onHostClick() {
     try {
+      // Get player name
+      const playerName = document.getElementById('player-name-input').value.trim() || 'Player';
+      localStorage.setItem('playerName', playerName);
+
       const roomId = await this.network.createRoom();
       document.getElementById('room-code').textContent = roomId;
 
       document.getElementById('btn-host').style.display = 'none';
       document.getElementById('btn-join').style.display = 'none';
+      document.getElementById('player-name-input').style.display = 'none';
       document.getElementById('room-info').style.display = 'block';
 
       this.isHost = true;
 
       // Create game host IMMEDIATELY when hosting starts
       console.log('🎮 Creating GameHost immediately on host click');
-      this.gameHost = new GameHost(this.network);
+      this.gameHost = new GameHost(this.network, playerName);
 
       // Set callback for when players are added
       this.gameHost.onPlayerAdded((player) => {
@@ -169,13 +180,17 @@ class Game {
       return;
     }
 
+    // Get player name
+    const playerName = document.getElementById('player-name-input').value.trim() || 'Player';
+    localStorage.setItem('playerName', playerName);
+
     try {
       document.getElementById('btn-join-room').disabled = true;
       document.getElementById('btn-join-room').textContent = 'Connecting...';
 
       // Setup client FIRST - before connecting
       console.log('🔧 Creating GameClient');
-      this.gameClient = new GameClient(this.network);
+      this.gameClient = new GameClient(this.network, playerName);
       console.log('🔧 Setting up callbacks BEFORE connecting');
       this.setupClientCallbacks();
 
@@ -377,10 +392,32 @@ class Game {
       playerData.position.z
     );
 
+    // Create name tag sprite
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = 256;
+    canvas.height = 64;
+
+    context.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    context.font = 'Bold 32px Arial';
+    context.fillStyle = 'white';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(playerData.name || playerData.id.substring(0, 8), canvas.width / 2, canvas.height / 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+    const sprite = new THREE.Sprite(spriteMaterial);
+    sprite.scale.set(2, 0.5, 1);
+    sprite.position.y = 1.5;
+    mesh.add(sprite);
+
     this.scene.add(mesh);
     this.players.set(playerData.id, mesh);
 
-    console.log('✅ Created player mesh:', playerData.id);
+    console.log('✅ Created player mesh:', playerData.id, playerData.name);
   }
 
   removePlayerMesh(playerId) {

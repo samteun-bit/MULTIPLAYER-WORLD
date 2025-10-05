@@ -1,7 +1,8 @@
 // Client game logic - receives state from host and sends input
 class GameClient {
-  constructor(network) {
+  constructor(network, playerName = 'Player') {
     this.network = network;
+    this.playerName = playerName;
     this.players = [];
     this.localPlayerId = null;
     this.config = null;
@@ -50,6 +51,13 @@ class GameClient {
           }
 
           console.log('📋 CLIENT: Players from init:', this.players);
+
+          // Send player name to host
+          this.network.sendToHost({
+            type: 'playerInfo',
+            name: this.playerName
+          });
+
           if (this.callbacks.onInit) {
             console.log('✅ CLIENT: Calling onInit callback');
             this.callbacks.onInit({
