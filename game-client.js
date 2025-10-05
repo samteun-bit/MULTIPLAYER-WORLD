@@ -24,7 +24,10 @@ class GameClient {
 
   setupNetworking() {
     this.network.onData((peerId, data) => {
-      console.log('📦 CLIENT: Received data:', data.type, data);
+      // Only log non-gameState messages
+      if (data.type !== 'gameState') {
+        console.log('📦 CLIENT: Received data:', data.type, data);
+      }
       switch (data.type) {
         case 'init':
           console.log('🎮 CLIENT: Received init data', data);
@@ -41,6 +44,9 @@ class GameClient {
               rotation: myPlayer.rotation,
               isGrounded: true
             };
+            console.log('✅ CLIENT: Local player state initialized for prediction', this.localPlayer);
+          } else {
+            console.error('❌ CLIENT: Could not find my player in init data!');
           }
 
           console.log('📋 CLIENT: Players from init:', this.players);

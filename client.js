@@ -409,17 +409,9 @@ class Game {
               );
               mesh.rotation.y = localState.rotation;
               return;
-            } else {
-              console.warn('⚠️ Local state is null!');
             }
-          } else {
-            console.warn('⚠️ gameClient or getLocalPlayerState not available!', {
-              hasGameClient: !!this.gameClient,
-              hasMethod: this.gameClient ? !!this.gameClient.getLocalPlayerState : false
-            });
           }
           // Fallback to server state if prediction not available
-          console.warn('⚠️ Using server position for local player (this causes stuttering)');
           mesh.position.set(
             playerData.position.x,
             playerData.position.y,
