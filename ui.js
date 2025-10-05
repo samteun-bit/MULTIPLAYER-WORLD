@@ -146,16 +146,24 @@ class UIManager {
     }, 5000);
   }
 
-  // Update dash gauge
-  updateDashGauge(cooldownTimer, maxCooldown) {
-    const percentage = Math.max(0, Math.min(100, ((maxCooldown - cooldownTimer) / maxCooldown) * 100));
-    this.dashGaugeFill.style.width = `${percentage}%`;
+  // Update dash gauge with stacks
+  updateDashGauge(cooldownTimer, maxCooldown, currentStacks, maxStacks) {
+    // Update stack indicators
+    const stackElements = document.querySelectorAll('.dash-stack');
+    stackElements.forEach((elem, index) => {
+      if (index < currentStacks) {
+        elem.classList.add('active');
+      } else {
+        elem.classList.remove('active');
+      }
+    });
 
-    // Change appearance when ready
-    if (percentage >= 100) {
-      this.dashGaugeFill.classList.add('ready');
+    // Update cooldown bar (only show if not at max stacks)
+    if (currentStacks < maxStacks && cooldownTimer > 0) {
+      const percentage = Math.max(0, Math.min(100, ((maxCooldown - cooldownTimer) / maxCooldown) * 100));
+      this.dashGaugeFill.style.width = `${percentage}%`;
     } else {
-      this.dashGaugeFill.classList.remove('ready');
+      this.dashGaugeFill.style.width = '0%';
     }
   }
 }

@@ -8,14 +8,15 @@ class GameHost {
 
     // Game config
     this.config = {
-      moveSpeed: 5,
+      moveSpeed: 8,
       jumpPower: 8,
       gravity: 20,
       groundLevel: 0.5,
       worldSize: 50,
-      dashSpeed: 20,
-      dashDuration: 0.15,
-      dashCooldown: 1.5
+      dashSpeed: 25,
+      dashDuration: 0.25,
+      dashCooldown: 2.0,
+      maxDashStacks: 3
     };
 
     this.lastUpdate = Date.now();
@@ -95,6 +96,7 @@ class GameHost {
       isDashing: false,
       dashTimer: 0,
       dashCooldownTimer: 0,
+      dashStacks: 3,
       dashDirection: { x: 0, z: 0 }
     };
 
@@ -175,9 +177,20 @@ class GameHost {
       const input = this.inputs.get(peerId);
       if (!input) return;
 
-      // Update dash cooldown
+      // Update dash cooldown and stacks
       if (player.dashCooldownTimer > 0) {
-        player.dashCooldownTimer = Math.max(0, player.dashCooldownTimer - dt);
+        player.dashCooldownTimer -= dt;
+        if (player.dashCooldownTimer <= 0) {
+          player.dashCooldownTimer = 0;
+          // Gain a stack when cooldown finishes
+          if (player.dashStacks < this.config.maxDashStacks) {
+            player.dashStacks++;
+            // Start next cooldown if not at max stacks
+            if (player.dashStacks < this.config.maxDashStacks) {
+              player.dashCooldownTimer = this.config.dashCooldown;
+            }
+          }
+        }
       }
 
       // Update dash timer
@@ -209,13 +222,18 @@ class GameHost {
       const rotatedX = moveX * Math.cos(-yaw) - moveZ * Math.sin(-yaw);
       const rotatedZ = moveX * Math.sin(-yaw) + moveZ * Math.cos(-yaw);
 
-      // Dash
-      if (input.dash && !player.isDashing && player.dashCooldownTimer <= 0 && (rotatedX !== 0 || rotatedZ !== 0)) {
+      // Dash - consume stack
+      if (input.dash && !player.isDashing && player.dashStacks > 0 && (rotatedX !== 0 || rotatedZ !== 0)) {
         player.isDashing = true;
         player.dashTimer = this.config.dashDuration;
-        player.dashCooldownTimer = this.config.dashCooldown;
+        player.dashStacks--;
         player.dashDirection.x = rotatedX;
         player.dashDirection.z = rotatedZ;
+
+        // Start cooldown if not already running
+        if (player.dashCooldownTimer <= 0) {
+          player.dashCooldownTimer = this.config.dashCooldown;
+        }
       }
 
       // Apply movement
@@ -281,7 +299,8 @@ class GameHost {
         position: p.position,
         rotation: p.rotation,
         color: p.color,
-        dashCooldownTimer: p.dashCooldownTimer
+        dashCooldownTimer: p.dashCooldownTimer,
+        dashStacks: p.dashStacks
       }))
     });
   }

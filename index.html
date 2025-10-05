@@ -186,26 +186,49 @@
       text-align: center;
     }
 
-    #dash-gauge-container {
-      width: 150px;
-      height: 20px;
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 10px;
-      overflow: hidden;
+    #dash-stacks {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+      justify-content: center;
+    }
+
+    .dash-stack {
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.1);
       border: 2px solid rgba(255, 255, 255, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255, 255, 255, 0.3);
+      font-size: 14px;
+      font-weight: bold;
+      transition: all 0.2s;
+    }
+
+    .dash-stack.active {
+      background: linear-gradient(135deg, #00ffff, #0088ff);
+      border-color: #00ffff;
+      color: white;
+      box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+    }
+
+    #dash-gauge-container {
+      width: 110px;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.3);
     }
 
     #dash-gauge-fill {
       height: 100%;
       background: linear-gradient(90deg, #00ffff, #0088ff);
-      border-radius: 8px;
+      border-radius: 3px;
       transition: width 0.1s linear;
-      box-shadow: 0 0 10px rgba(0, 200, 255, 0.5);
-    }
-
-    #dash-gauge-fill.ready {
-      background: linear-gradient(90deg, #00ff88, #00ffff);
-      box-shadow: 0 0 15px rgba(0, 255, 200, 0.8);
     }
 
     /* Loading Screen */
@@ -292,8 +315,13 @@
       <!-- Dash Gauge -->
       <div id="dash-gauge">
         <div id="dash-gauge-label">Dash</div>
+        <div id="dash-stacks">
+          <div class="dash-stack active">1</div>
+          <div class="dash-stack active">2</div>
+          <div class="dash-stack active">3</div>
+        </div>
         <div id="dash-gauge-container">
-          <div id="dash-gauge-fill" style="width: 100%;"></div>
+          <div id="dash-gauge-fill" style="width: 0%;"></div>
         </div>
       </div>
     </div>

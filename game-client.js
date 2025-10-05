@@ -48,6 +48,7 @@ class GameClient {
               isDashing: false,
               dashTimer: 0,
               dashCooldownTimer: 0,
+              dashStacks: 3,
               dashDirection: { x: 0, z: 0 }
             };
             this.lastInput = {
@@ -137,9 +138,20 @@ class GameClient {
   }
 
   updateLocalPlayer(input, dt) {
-    // Update dash cooldown
+    // Update dash cooldown and stacks
     if (this.localPlayer.dashCooldownTimer > 0) {
-      this.localPlayer.dashCooldownTimer = Math.max(0, this.localPlayer.dashCooldownTimer - dt);
+      this.localPlayer.dashCooldownTimer -= dt;
+      if (this.localPlayer.dashCooldownTimer <= 0) {
+        this.localPlayer.dashCooldownTimer = 0;
+        // Gain a stack when cooldown finishes
+        if (this.localPlayer.dashStacks < this.config.maxDashStacks) {
+          this.localPlayer.dashStacks++;
+          // Start next cooldown if not at max stacks
+          if (this.localPlayer.dashStacks < this.config.maxDashStacks) {
+            this.localPlayer.dashCooldownTimer = this.config.dashCooldown;
+          }
+        }
+      }
     }
 
     // Update dash timer
@@ -171,13 +183,18 @@ class GameClient {
     const rotatedX = moveX * Math.cos(-yaw) - moveZ * Math.sin(-yaw);
     const rotatedZ = moveX * Math.sin(-yaw) + moveZ * Math.cos(-yaw);
 
-    // Dash
-    if (input.dash && !this.localPlayer.isDashing && this.localPlayer.dashCooldownTimer <= 0 && (rotatedX !== 0 || rotatedZ !== 0)) {
+    // Dash - consume stack
+    if (input.dash && !this.localPlayer.isDashing && this.localPlayer.dashStacks > 0 && (rotatedX !== 0 || rotatedZ !== 0)) {
       this.localPlayer.isDashing = true;
       this.localPlayer.dashTimer = this.config.dashDuration;
-      this.localPlayer.dashCooldownTimer = this.config.dashCooldown;
+      this.localPlayer.dashStacks--;
       this.localPlayer.dashDirection.x = rotatedX;
       this.localPlayer.dashDirection.z = rotatedZ;
+
+      // Start cooldown if not already running
+      if (this.localPlayer.dashCooldownTimer <= 0) {
+        this.localPlayer.dashCooldownTimer = this.config.dashCooldown;
+      }
     }
 
     // Apply movement

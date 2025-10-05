@@ -548,18 +548,21 @@ class Game {
     // Update dash gauge
     if (this.config) {
       let dashCooldown = 0;
+      let dashStacks = 3;
 
-      // Get dash cooldown from local player
+      // Get dash data from local player
       if (this.isHost && this.gameHost) {
         const hostPlayer = this.gameHost.players.get(this.localPlayerId);
         if (hostPlayer) {
           dashCooldown = hostPlayer.dashCooldownTimer;
+          dashStacks = hostPlayer.dashStacks;
         }
       } else if (this.gameClient && this.gameClient.localPlayer) {
         dashCooldown = this.gameClient.localPlayer.dashCooldownTimer;
+        dashStacks = this.gameClient.localPlayer.dashStacks;
       }
 
-      ui.updateDashGauge(dashCooldown, this.config.dashCooldown);
+      ui.updateDashGauge(dashCooldown, this.config.dashCooldown, dashStacks, this.config.maxDashStacks);
     }
 
     this.updateCamera();
