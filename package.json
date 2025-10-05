@@ -15,7 +15,6 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "firebase": "^12.3.0",
     "peerjs": "^1.5.5"
   }
 }
