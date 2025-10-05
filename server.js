@@ -92,7 +92,7 @@ setInterval(() => {
     const input = inputs.get(socketId);
     if (!input) return;
 
-    // Calculate movement direction
+    // Calculate movement direction (local space)
     let moveX = 0;
     let moveZ = 0;
 
@@ -108,9 +108,14 @@ setInterval(() => {
       moveZ /= length;
     }
 
+    // Rotate movement direction based on camera yaw
+    const cameraYaw = input.cameraYaw || 0;
+    const rotatedX = moveX * Math.cos(-cameraYaw) - moveZ * Math.sin(-cameraYaw);
+    const rotatedZ = moveX * Math.sin(-cameraYaw) + moveZ * Math.cos(-cameraYaw);
+
     // Apply movement
-    player.velocity.x = moveX * GAME_CONFIG.moveSpeed;
-    player.velocity.z = moveZ * GAME_CONFIG.moveSpeed;
+    player.velocity.x = rotatedX * GAME_CONFIG.moveSpeed;
+    player.velocity.z = rotatedZ * GAME_CONFIG.moveSpeed;
 
     // Handle jumping
     if (input.jump && player.isGrounded) {
@@ -140,9 +145,9 @@ setInterval(() => {
     player.position.x = Math.max(-halfWorld, Math.min(halfWorld, player.position.x));
     player.position.z = Math.max(-halfWorld, Math.min(halfWorld, player.position.z));
 
-    // Update rotation based on movement
-    if (moveX !== 0 || moveZ !== 0) {
-      player.rotation = Math.atan2(moveX, moveZ);
+    // Update rotation based on movement (use rotated movement for player facing)
+    if (rotatedX !== 0 || rotatedZ !== 0) {
+      player.rotation = Math.atan2(rotatedX, rotatedZ);
     }
   });
 

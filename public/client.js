@@ -183,7 +183,8 @@ class Game {
         backward: this.keys.backward,
         left: this.keys.left,
         right: this.keys.right,
-        jump: this.keys.jump
+        jump: this.keys.jump,
+        cameraYaw: this.cameraRotation.yaw // Send camera rotation
       });
     }
   }
