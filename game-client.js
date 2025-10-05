@@ -59,23 +59,7 @@ class GameClient {
         case 'gameState':
           this.players = data.players;
 
-          // Server reconciliation: very gentle correction only if difference is significant
-          const serverPlayer = data.players.find(p => p.id === this.localPlayerId);
-          if (serverPlayer && this.localPlayer) {
-            // Only correct if position difference is large (prevents drift but allows freedom)
-            const dx = serverPlayer.position.x - this.localPlayer.position.x;
-            const dy = serverPlayer.position.y - this.localPlayer.position.y;
-            const dz = serverPlayer.position.z - this.localPlayer.position.z;
-            const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
-
-            // Only correct if more than 2 units off (very lenient)
-            if (distance > 2.0) {
-              const correctionFactor = 0.05; // Very gentle
-              this.localPlayer.position.x += dx * correctionFactor;
-              this.localPlayer.position.y += dy * correctionFactor;
-              this.localPlayer.position.z += dz * correctionFactor;
-            }
-          }
+          // No server reconciliation - client is fully independent
 
           if (this.callbacks.onGameState) {
             this.callbacks.onGameState(data.players);
