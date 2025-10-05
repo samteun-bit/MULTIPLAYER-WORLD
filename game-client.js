@@ -87,8 +87,8 @@ class GameClient {
     // Store input for client-side prediction
     this.lastInput = input;
 
-    // Send to server
-    this.network.send({
+    // Send to host (P2P)
+    this.network.sendToHost({
       type: 'input',
       input: input
     });

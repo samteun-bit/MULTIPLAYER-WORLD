@@ -1,24 +1,21 @@
 {
   "name": "multiplayerworld",
-  "version": "1.0.0",
-  "description": "Simple multiplayer web game with Three.js and Socket.IO",
-  "main": "server.js",
+  "version": "2.0.0",
+  "description": "Serverless P2P multiplayer web game with Three.js and WebRTC",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "npx http-server -p 8080 -c-1"
   },
   "keywords": [
     "multiplayer",
     "game",
     "threejs",
-    "socketio"
+    "webrtc",
+    "p2p"
   ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.21.2",
-    "peerjs": "^1.5.5",
-    "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1"
+    "firebase": "^12.3.0",
+    "peerjs": "^1.5.5"
   }
 }

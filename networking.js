@@ -1,10 +1,14 @@
-// Simple Socket.IO based networking
+// WebRTC P2P networking with PeerJS - optimized for low latency
 class NetworkManager {
   constructor() {
-    this.socket = null;
+    this.peer = null;
     this.peerId = null;
     this.isHost = false;
     this.roomId = null;
+
+    // P2P connections
+    this.connections = new Map(); // peerId -> DataConnection
+    this.hostConnection = null; // For clients: connection to host
 
     // Event handlers
     this.handlers = {
@@ -12,131 +16,205 @@ class NetworkManager {
       onDisconnect: null,
       onData: null
     };
+
+    // Firebase (for room management)
+    this.db = null;
+    this.roomRef = null;
   }
 
-  // Initialize Socket.IO connection
+  // Initialize PeerJS
   async init() {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('Socket.IO connection timeout'));
+        reject(new Error('PeerJS connection timeout'));
       }, 10000);
 
-      // Connect to server (automatically uses current host in production)
-      this.socket = io();
+      // Use PeerJS cloud server
+      this.peer = new Peer({
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+          ]
+        }
+      });
 
-      this.socket.on('connect', () => {
+      this.peer.on('open', (id) => {
         clearTimeout(timeout);
-        this.peerId = this.socket.id;
-        console.log('✅ Socket.IO connected:', this.peerId);
+        this.peerId = id;
+        console.log('✅ PeerJS connected:', this.peerId);
         resolve(this.peerId);
       });
 
-      this.socket.on('connect_error', (error) => {
+      this.peer.on('error', (error) => {
         clearTimeout(timeout);
-        console.error('❌ Socket.IO connection error:', error);
+        console.error('❌ PeerJS error:', error);
         reject(error);
       });
 
-      // Handle player joined
-      this.socket.on('playerJoined', (data) => {
-        console.log('📥 Player joined:', data.peerId);
-        if (this.handlers.onConnect) {
-          this.handlers.onConnect(data.peerId);
-        }
+      // Listen for incoming connections (host only)
+      this.peer.on('connection', (conn) => {
+        console.log('📥 Incoming connection from:', conn.peer);
+        this.setupConnection(conn);
       });
+    });
+  }
 
-      // Handle player left
-      this.socket.on('playerLeft', (data) => {
-        console.log('📥 Player left:', data.peerId);
-        if (this.handlers.onDisconnect) {
-          this.handlers.onDisconnect(data.peerId);
-        }
-      });
+  // Setup DataConnection with optimal settings
+  setupConnection(conn) {
+    // Wait for connection to open
+    conn.on('open', () => {
+      console.log('✅ Connection opened with:', conn.peer);
+      this.connections.set(conn.peer, conn);
 
-      // Handle data from other players
-      this.socket.on('gameData', (data) => {
-        // Only log non-gameState messages to reduce spam
-        if (data.type !== 'gameState') {
-          console.log('📦 Received data from', data.from, ':', data.type);
-        }
-        if (this.handlers.onData) {
-          this.handlers.onData(data.from, data.payload);
-        }
-      });
+      if (this.handlers.onConnect) {
+        this.handlers.onConnect(conn.peer);
+      }
+    });
+
+    // Handle incoming data
+    conn.on('data', (data) => {
+      if (this.handlers.onData) {
+        this.handlers.onData(conn.peer, data);
+      }
+    });
+
+    // Handle disconnection
+    conn.on('close', () => {
+      console.log('❌ Connection closed:', conn.peer);
+      this.connections.delete(conn.peer);
+
+      if (this.handlers.onDisconnect) {
+        this.handlers.onDisconnect(conn.peer);
+      }
+    });
+
+    conn.on('error', (error) => {
+      console.error('❌ Connection error:', error);
     });
   }
 
   // Create room (become host)
-  createRoom() {
-    return new Promise((resolve) => {
-      this.socket.emit('createRoom', {}, (response) => {
-        if (response.success) {
-          this.isHost = true;
-          this.roomId = response.roomId;
-          console.log('🏠 Room created:', this.roomId);
-          resolve(this.roomId);
-        } else {
-          console.error('Failed to create room:', response.error);
-          resolve(null);
-        }
-      });
+  async createRoom() {
+    this.isHost = true;
+
+    // Generate 6-digit room code
+    this.roomId = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Initialize Firebase
+    await this.initFirebase();
+
+    // Create room in Firebase
+    this.roomRef = firebase.database().ref('rooms/' + this.roomId);
+    await this.roomRef.set({
+      hostId: this.peerId,
+      createdAt: Date.now()
     });
+
+    console.log('🏠 Room created:', this.roomId);
+    return this.roomId;
   }
 
   // Join room (become client)
   async joinRoom(roomId) {
-    return new Promise((resolve, reject) => {
-      console.log('🔗 Joining room:', roomId);
+    this.roomId = roomId;
+    this.isHost = false;
 
-      this.socket.emit('joinRoom', { roomId }, (response) => {
-        if (response.success) {
-          this.isHost = false;
-          this.roomId = roomId;
-          console.log('✅ Joined room successfully!');
-          resolve();
-        } else {
-          console.error('❌ Failed to join room:', response.error);
-          reject(new Error(response.error));
-        }
+    // Initialize Firebase
+    await this.initFirebase();
+
+    // Get host ID from Firebase
+    const roomRef = firebase.database().ref('rooms/' + roomId);
+    const snapshot = await roomRef.once('value');
+
+    if (!snapshot.exists()) {
+      throw new Error('Room not found');
+    }
+
+    const hostId = snapshot.val().hostId;
+    console.log('🔗 Connecting to host:', hostId);
+
+    // Connect to host with optimized DataChannel settings
+    const conn = this.peer.connect(hostId, {
+      reliable: false, // UDP-like behavior
+      serialization: 'json'
+    });
+
+    this.hostConnection = conn;
+    this.setupConnection(conn);
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Connection timeout'));
+      }, 10000);
+
+      conn.on('open', () => {
+        clearTimeout(timeout);
+        console.log('✅ Connected to host');
+        resolve();
+      });
+
+      conn.on('error', (error) => {
+        clearTimeout(timeout);
+        reject(error);
       });
     });
   }
 
-  // Send data
+  // Initialize Firebase
+  async initFirebase() {
+    if (this.db) return; // Already initialized
+
+    // Firebase config (using public demo database)
+    const firebaseConfig = {
+      apiKey: "AIzaSyDummy_Demo_Key_For_Testing",
+      databaseURL: "https://multiplayer-game-demo-default-rtdb.firebaseio.com"
+    };
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+
+    this.db = firebase.database();
+  }
+
+  // Send data to all clients (host only)
   send(data) {
-    if (!this.roomId) {
-      console.error('❌ Not in a room');
+    if (!this.isHost) {
+      console.error('❌ Only host can broadcast');
       return;
     }
 
-    // Only log non-gameState messages to reduce spam
-    if (data.type !== 'gameState') {
-      console.log('📤 Broadcasting:', data.type);
-    }
-
-    this.socket.emit('broadcast', {
-      roomId: this.roomId,
-      payload: data
+    this.connections.forEach((conn, peerId) => {
+      if (conn.open) {
+        conn.send(data);
+      }
     });
   }
 
-  // Send to specific peer (host only)
+  // Send data to specific peer (host only)
   sendTo(peerId, data) {
     if (!this.isHost) {
-      console.log('⚠️ sendTo called but not host');
+      console.error('❌ Only host can send to specific peer');
       return;
     }
 
-    // Only log non-input/non-gameState messages
-    if (data.type !== 'input' && data.type !== 'gameState') {
-      console.log('📤 Sending to', peerId, ':', data.type);
+    const conn = this.connections.get(peerId);
+    if (conn && conn.open) {
+      conn.send(data);
+    }
+  }
+
+  // Send data to host (client only)
+  sendToHost(data) {
+    if (this.isHost) {
+      console.error('❌ Host cannot send to itself');
+      return;
     }
 
-    this.socket.emit('sendToPeer', {
-      roomId: this.roomId,
-      peerId: peerId,
-      payload: data
-    });
+    if (this.hostConnection && this.hostConnection.open) {
+      this.hostConnection.send(data);
+    }
   }
 
   // Set event handlers
@@ -154,11 +232,19 @@ class NetworkManager {
 
   // Cleanup
   destroy() {
-    if (this.socket) {
-      if (this.roomId) {
-        this.socket.emit('leaveRoom', { roomId: this.roomId });
-      }
-      this.socket.disconnect();
+    if (this.roomRef) {
+      this.roomRef.remove();
+    }
+
+    this.connections.forEach(conn => conn.close());
+    this.connections.clear();
+
+    if (this.hostConnection) {
+      this.hostConnection.close();
+    }
+
+    if (this.peer) {
+      this.peer.destroy();
     }
   }
 }
