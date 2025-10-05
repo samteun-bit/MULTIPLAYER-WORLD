@@ -86,8 +86,28 @@ class NetworkManager {
     });
 
     conn.on('error', (error) => {
-      console.error('❌ Connection error:', error);
+      console.error('❌ Connection error with', conn.peer, ':', error);
+      // Also trigger disconnect on error
+      this.connections.delete(conn.peer);
+      if (this.handlers.onDisconnect) {
+        this.handlers.onDisconnect(conn.peer);
+      }
     });
+
+    // Check connection status periodically (for detecting disconnects)
+    const checkInterval = setInterval(() => {
+      if (!conn.open && this.connections.has(conn.peer)) {
+        console.log('⚠️ Detected closed connection:', conn.peer);
+        this.connections.delete(conn.peer);
+        if (this.handlers.onDisconnect) {
+          this.handlers.onDisconnect(conn.peer);
+        }
+        clearInterval(checkInterval);
+      }
+    }, 1000);
+
+    // Store interval reference for cleanup
+    conn._checkInterval = checkInterval;
   }
 
   // Create room (become host)
@@ -187,10 +207,18 @@ class NetworkManager {
 
   // Cleanup
   destroy() {
-    this.connections.forEach(conn => conn.close());
+    this.connections.forEach(conn => {
+      if (conn._checkInterval) {
+        clearInterval(conn._checkInterval);
+      }
+      conn.close();
+    });
     this.connections.clear();
 
     if (this.hostConnection) {
+      if (this.hostConnection._checkInterval) {
+        clearInterval(this.hostConnection._checkInterval);
+      }
       this.hostConnection.close();
     }
 
