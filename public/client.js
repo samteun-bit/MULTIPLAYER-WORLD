@@ -115,54 +115,11 @@ class Game {
     this.animate();
   }
 
-  // Setup keyboard and mouse controls
+  // Setup keyboard controls
   setupControls() {
     // Keyboard controls
     window.addEventListener('keydown', (e) => this.onKeyDown(e));
     window.addEventListener('keyup', (e) => this.onKeyUp(e));
-
-    // Mouse controls - Click and drag
-    const canvas = this.renderer.domElement;
-
-    canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
-    window.addEventListener('mouseup', (e) => this.onMouseUp(e));
-    window.addEventListener('mousemove', (e) => this.onMouseMove(e));
-
-    // Prevent context menu on right click
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-  }
-
-  // Handle mouse down
-  onMouseDown(event) {
-    this.mouse.isDragging = true;
-    this.mouse.lastX = event.clientX;
-    this.mouse.lastY = event.clientY;
-  }
-
-  // Handle mouse up
-  onMouseUp(event) {
-    this.mouse.isDragging = false;
-  }
-
-  // Handle mouse movement
-  onMouseMove(event) {
-    if (!this.mouse.isDragging) return;
-
-    const deltaX = event.clientX - this.mouse.lastX;
-    const deltaY = event.clientY - this.mouse.lastY;
-
-    // Update camera rotation based on mouse drag
-    this.cameraRotation.yaw -= deltaX * CONFIG.camera.mouseSensitivity;
-    this.cameraRotation.pitch -= deltaY * CONFIG.camera.mouseSensitivity;
-
-    // Clamp vertical rotation
-    this.cameraRotation.pitch = Math.max(
-      -CONFIG.camera.maxPolarAngle,
-      Math.min(-CONFIG.camera.minPolarAngle, this.cameraRotation.pitch)
-    );
-
-    this.mouse.lastX = event.clientX;
-    this.mouse.lastY = event.clientY;
   }
 
   onKeyDown(event) {
@@ -181,6 +138,16 @@ class Game {
         break;
       case 'Space':
         this.keys.jump = true;
+        event.preventDefault();
+        break;
+      case 'KeyP':
+        // Rotate camera 90 degrees counterclockwise
+        this.cameraRotation.yaw -= Math.PI / 2;
+        event.preventDefault();
+        break;
+      case 'KeyO':
+        // Rotate camera 90 degrees clockwise
+        this.cameraRotation.yaw += Math.PI / 2;
         event.preventDefault();
         break;
     }

@@ -59,7 +59,8 @@ const CONFIG = {
       { key: 'S', action: 'Move Backward' },
       { key: 'D', action: 'Move Right' },
       { key: 'Space', action: 'Jump' },
-      { key: 'Mouse', action: 'Look Around' }
+      { key: 'P', action: 'Rotate Camera 90° ↺ (CCW)' },
+      { key: 'O', action: 'Rotate Camera 90° ↻ (CW)' }
     ]
   }
 };
