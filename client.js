@@ -412,6 +412,9 @@ class Game {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
 
+    // Store player name in userData for tracking
+    mesh.userData.playerName = playerData.name || 'Player';
+
     mesh.position.set(
       playerData.position.x,
       playerData.position.y,
@@ -430,11 +433,11 @@ class Game {
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     // Draw shadow (offset)
-    context.fillText(playerData.name || playerData.id.substring(0, 8), canvas.width / 2 + 2, canvas.height / 2 + 2);
+    context.fillText(mesh.userData.playerName, canvas.width / 2 + 2, canvas.height / 2 + 2);
 
     // Draw white text on top
     context.fillStyle = 'white';
-    context.fillText(playerData.name || playerData.id.substring(0, 8), canvas.width / 2, canvas.height / 2);
+    context.fillText(mesh.userData.playerName, canvas.width / 2, canvas.height / 2);
 
     const texture = new THREE.CanvasTexture(canvas);
     const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
@@ -446,16 +449,28 @@ class Game {
     this.scene.add(mesh);
     this.players.set(playerData.id, mesh);
 
-    console.log('✅ Created player mesh:', playerData.id, playerData.name);
+    console.log('✅ Created player mesh:', playerData.id, mesh.userData.playerName);
   }
 
   removePlayerMesh(playerId) {
     const mesh = this.players.get(playerId);
     if (mesh) {
+      // Clean up sprite and texture
+      const sprite = mesh.children.find(child => child instanceof THREE.Sprite);
+      if (sprite) {
+        if (sprite.material.map) {
+          sprite.material.map.dispose();
+        }
+        sprite.material.dispose();
+      }
+
+      // Remove from scene
       this.scene.remove(mesh);
       mesh.geometry.dispose();
       mesh.material.dispose();
       this.players.delete(playerId);
+
+      console.log('🗑️ Removed player mesh:', playerId);
     }
   }
 
@@ -463,6 +478,12 @@ class Game {
     players.forEach(playerData => {
       const mesh = this.players.get(playerData.id);
       if (mesh) {
+        // Update name tag if name changed
+        if (mesh.userData.playerName !== playerData.name) {
+          this.updatePlayerNameTag(mesh, playerData.name);
+          mesh.userData.playerName = playerData.name;
+        }
+
         // For local player: use client-side predicted position
         if (playerData.id === this.localPlayerId) {
           if (this.gameClient && this.gameClient.getLocalPlayerState) {
@@ -507,6 +528,38 @@ class Game {
         mesh.rotation.y += diff * lerpFactor;
       }
     });
+  }
+
+  updatePlayerNameTag(mesh, newName) {
+    // Find and remove old sprite
+    const oldSprite = mesh.children.find(child => child instanceof THREE.Sprite);
+    if (oldSprite) {
+      mesh.remove(oldSprite);
+      oldSprite.material.map.dispose();
+      oldSprite.material.dispose();
+    }
+
+    // Create new name tag
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = 256;
+    canvas.height = 64;
+
+    context.font = 'Bold 32px Arial';
+    context.fillStyle = 'black';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(newName || 'Player', canvas.width / 2 + 2, canvas.height / 2 + 2);
+
+    context.fillStyle = 'white';
+    context.fillText(newName || 'Player', canvas.width / 2, canvas.height / 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+    const sprite = new THREE.Sprite(spriteMaterial);
+    sprite.scale.set(2, 0.5, 1);
+    sprite.position.y = 1.5;
+    mesh.add(sprite);
   }
 
   updateCamera() {
