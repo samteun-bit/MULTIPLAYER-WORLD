@@ -25,6 +25,7 @@ class GameHost {
     // Callbacks for rendering
     this.onPlayerAddedCallback = null;
     this.onPlayerRemovedCallback = null;
+    this.onChatMessageCallback = null;
 
     this.setupNetworking();
   }
@@ -69,6 +70,11 @@ class GameHost {
           message: data.message,
           timestamp: data.timestamp
         });
+
+        // Show on host's screen too (if not own message)
+        if (this.onChatMessageCallback && data.playerId !== this.network.peerId) {
+          this.onChatMessageCallback(data);
+        }
       }
     });
   }
@@ -166,6 +172,10 @@ class GameHost {
 
   onPlayerRemoved(callback) {
     this.onPlayerRemovedCallback = callback;
+  }
+
+  onChatMessage(callback) {
+    this.onChatMessageCallback = callback;
   }
 
   removePlayer(peerId) {

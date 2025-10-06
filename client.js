@@ -206,6 +206,11 @@ class Game {
         ui.removePlayer(peerId);
       });
 
+      this.gameHost.onChatMessage((chatData) => {
+        console.log('💬 HOST: Chat message callback:', chatData);
+        this.showChatBubble(chatData.playerId, chatData.message);
+      });
+
       // Setup host-specific callbacks for rendering (polling backup)
       this.setupHostCallbacks();
     } catch (error) {
@@ -282,16 +287,8 @@ class Game {
   }
 
   setupHostCallbacks() {
-    // Set up chat callback for host to receive chat messages
-    this.network.onData((peerId, data) => {
-      if (data.type === 'chat') {
-        console.log('💬 HOST CLIENT: Chat received from', peerId, ':', data.message);
-        // Don't show own messages again (already shown optimistically)
-        if (data.playerId !== this.localPlayerId) {
-          this.showChatBubble(data.playerId, data.message);
-        }
-      }
-    });
+    // DO NOT override network.onData here - GameHost already handles it
+    // Just set up visual callbacks
 
     // Polling backup for syncing player names and detecting edge cases
     setInterval(() => {
