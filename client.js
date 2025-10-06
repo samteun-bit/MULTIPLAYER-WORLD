@@ -16,6 +16,10 @@ class Game {
     this.localPlayerId = null;
     this.config = null;
 
+    // Axe throwing
+    this.axes = new Map(); // playerId -> axe data
+    this.axeAvailable = true; // Can throw axe
+
     // Input
     this.keys = {
       forward: false,
@@ -433,6 +437,12 @@ class Game {
         changed = true;
         event.preventDefault();
         break;
+      case 'KeyK':
+        if (this.axeAvailable) {
+          this.throwAxe();
+        }
+        event.preventDefault();
+        break;
     }
 
     if (changed) {
@@ -538,12 +548,42 @@ class Game {
     const sprite = new THREE.Sprite(spriteMaterial);
     sprite.scale.set(2, 0.5, 1);
     sprite.position.y = 1.5;
+    sprite.userData.isNameTag = true;
     mesh.add(sprite);
+
+    // Create axe (held by player)
+    const axe = this.createAxeMesh();
+    axe.position.set(0.7, 0.3, 0); // Right side of player
+    axe.userData.isAxe = true;
+    mesh.add(axe);
 
     this.scene.add(mesh);
     this.players.set(playerData.id, mesh);
 
     console.log('✅ Created player mesh:', playerData.id, mesh.userData.playerName);
+  }
+
+  createAxeMesh() {
+    // Axe handle (stick)
+    const handleGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.8, 8);
+    const handleMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // Brown
+    const handle = new THREE.Mesh(handleGeometry, handleMaterial);
+    handle.castShadow = true;
+
+    // Axe blade (wedge shape)
+    const bladeGeometry = new THREE.BoxGeometry(0.4, 0.3, 0.05);
+    const bladeMaterial = new THREE.MeshLambertMaterial({ color: 0xC0C0C0 }); // Silver
+    const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
+    blade.position.y = 0.4;
+    blade.castShadow = true;
+
+    // Combine handle and blade
+    const axe = new THREE.Group();
+    axe.add(handle);
+    axe.add(blade);
+    axe.rotation.z = Math.PI / 4; // Tilt
+
+    return axe;
   }
 
   removePlayerMesh(playerId) {
@@ -830,6 +870,102 @@ class Game {
     }, 5000);
   }
 
+  throwAxe() {
+    const localPlayer = this.players.get(this.localPlayerId);
+    if (!localPlayer || !this.axeAvailable) return;
+
+    // Mark axe as unavailable
+    this.axeAvailable = false;
+
+    // Hide player's held axe
+    const heldAxe = localPlayer.children.find(child => child.userData.isAxe);
+    if (heldAxe) {
+      heldAxe.visible = false;
+    }
+
+    // Get throw direction from camera
+    const direction = new THREE.Vector3();
+    this.camera.getWorldDirection(direction);
+
+    // Create flying axe
+    const flyingAxe = this.createAxeMesh();
+    flyingAxe.position.copy(localPlayer.position);
+    flyingAxe.position.y += 0.5; // Center height
+    this.scene.add(flyingAxe);
+
+    // Store axe data
+    const axeData = {
+      mesh: flyingAxe,
+      direction: direction.clone(),
+      startPos: localPlayer.position.clone(),
+      distanceTraveled: 0,
+      maxDistance: 20, // Max throw distance
+      returning: false,
+      playerId: this.localPlayerId,
+      rotation: 0
+    };
+    this.axes.set(this.localPlayerId, axeData);
+
+    console.log('🪓 Threw axe');
+  }
+
+  updateAxes() {
+    this.axes.forEach((axeData, playerId) => {
+      const player = this.players.get(playerId);
+      if (!player) return;
+
+      const speed = 0.5; // Axe speed
+      const rotationSpeed = 0.3; // Rotation speed
+
+      if (!axeData.returning) {
+        // Flying forward
+        axeData.mesh.position.add(axeData.direction.clone().multiplyScalar(speed));
+        axeData.distanceTraveled += speed;
+
+        // Rotate axe
+        axeData.rotation += rotationSpeed;
+        axeData.mesh.rotation.x = axeData.rotation;
+
+        // Start returning after max distance
+        if (axeData.distanceTraveled >= axeData.maxDistance) {
+          axeData.returning = true;
+        }
+      } else {
+        // Returning to player
+        const directionToPlayer = new THREE.Vector3();
+        directionToPlayer.subVectors(player.position, axeData.mesh.position);
+        const distance = directionToPlayer.length();
+
+        if (distance < 1) {
+          // Axe returned - remove flying axe
+          this.scene.remove(axeData.mesh);
+          this.axes.delete(playerId);
+
+          // Show held axe again
+          const heldAxe = player.children.find(child => child.userData.isAxe);
+          if (heldAxe) {
+            heldAxe.visible = true;
+          }
+
+          // Make axe available again
+          if (playerId === this.localPlayerId) {
+            this.axeAvailable = true;
+          }
+
+          console.log('🪓 Axe returned');
+        } else {
+          // Move towards player
+          directionToPlayer.normalize();
+          axeData.mesh.position.add(directionToPlayer.multiplyScalar(speed));
+
+          // Rotate axe
+          axeData.rotation += rotationSpeed;
+          axeData.mesh.rotation.x = axeData.rotation;
+        }
+      }
+    });
+  }
+
   updateCamera() {
     const localPlayer = this.players.get(this.localPlayerId);
     if (!localPlayer) return;
@@ -893,6 +1029,7 @@ class Game {
       ui.updateDashGauge(dashCooldown, this.config.dashCooldown, dashStacks, this.config.maxDashStacks);
     }
 
+    this.updateAxes();
     this.updateCamera();
     this.renderer.render(this.scene, this.camera);
     ui.updateFPS();
