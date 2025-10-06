@@ -16,9 +16,9 @@ class Game {
     this.localPlayerId = null;
     this.config = null;
 
-    // Axe throwing
-    this.axes = new Map(); // playerId -> axe data
-    this.axeAvailable = true; // Can throw axe
+    // Spike ball throwing
+    this.spikeBalls = new Map(); // playerId -> spike ball data
+    this.spikeBallAvailable = true; // Can throw spike ball
 
     // Input
     this.keys = {
@@ -438,8 +438,8 @@ class Game {
         event.preventDefault();
         break;
       case 'KeyK':
-        if (this.axeAvailable) {
-          this.throwAxe();
+        if (this.spikeBallAvailable) {
+          this.throwSpikeBall();
         }
         event.preventDefault();
         break;
@@ -551,11 +551,11 @@ class Game {
     sprite.userData.isNameTag = true;
     mesh.add(sprite);
 
-    // Create axe (held by player)
-    const axe = this.createAxeMesh();
-    axe.position.set(0.7, 0.3, 0); // Right side of player
-    axe.userData.isAxe = true;
-    mesh.add(axe);
+    // Create spike ball (held by player)
+    const spikeBall = this.createSpikeBallMesh();
+    spikeBall.position.set(0.7, 0.3, 0); // Right side of player
+    spikeBall.userData.isSpikeBall = true;
+    mesh.add(spikeBall);
 
     this.scene.add(mesh);
     this.players.set(playerData.id, mesh);
@@ -563,27 +563,46 @@ class Game {
     console.log('✅ Created player mesh:', playerData.id, mesh.userData.playerName);
   }
 
-  createAxeMesh() {
-    // Axe handle (stick)
-    const handleGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.8, 8);
-    const handleMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // Brown
-    const handle = new THREE.Mesh(handleGeometry, handleMaterial);
-    handle.castShadow = true;
+  createSpikeBallMesh() {
+    // Main sphere
+    const sphereGeometry = new THREE.SphereGeometry(0.25, 16, 16);
+    const sphereMaterial = new THREE.MeshLambertMaterial({ color: 0x404040 }); // Dark gray
+    const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+    sphere.castShadow = true;
 
-    // Axe blade (wedge shape)
-    const bladeGeometry = new THREE.BoxGeometry(0.4, 0.3, 0.05);
-    const bladeMaterial = new THREE.MeshLambertMaterial({ color: 0xC0C0C0 }); // Silver
-    const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
-    blade.position.y = 0.4;
-    blade.castShadow = true;
+    // Spikes
+    const spikeGeometry = new THREE.ConeGeometry(0.05, 0.2, 8);
+    const spikeMaterial = new THREE.MeshLambertMaterial({ color: 0x606060 }); // Lighter gray
 
-    // Combine handle and blade
-    const axe = new THREE.Group();
-    axe.add(handle);
-    axe.add(blade);
-    axe.rotation.z = Math.PI / 4; // Tilt
+    const spikeBall = new THREE.Group();
+    spikeBall.add(sphere);
 
-    return axe;
+    // Add spikes in different directions
+    const spikePositions = [
+      { x: 0.25, y: 0, z: 0 },
+      { x: -0.25, y: 0, z: 0 },
+      { x: 0, y: 0.25, z: 0 },
+      { x: 0, y: -0.25, z: 0 },
+      { x: 0, y: 0, z: 0.25 },
+      { x: 0, y: 0, z: -0.25 },
+      { x: 0.18, y: 0.18, z: 0 },
+      { x: -0.18, y: 0.18, z: 0 },
+      { x: 0.18, y: -0.18, z: 0 },
+      { x: -0.18, y: -0.18, z: 0 },
+      { x: 0, y: 0.18, z: 0.18 },
+      { x: 0, y: -0.18, z: 0.18 },
+    ];
+
+    spikePositions.forEach(pos => {
+      const spike = new THREE.Mesh(spikeGeometry, spikeMaterial);
+      spike.position.set(pos.x, pos.y, pos.z);
+      // Point spike outward from center
+      spike.lookAt(pos.x * 2, pos.y * 2, pos.z * 2);
+      spike.castShadow = true;
+      spikeBall.add(spike);
+    });
+
+    return spikeBall;
   }
 
   removePlayerMesh(playerId) {
@@ -870,32 +889,36 @@ class Game {
     }, 5000);
   }
 
-  throwAxe() {
+  throwSpikeBall() {
     const localPlayer = this.players.get(this.localPlayerId);
-    if (!localPlayer || !this.axeAvailable) return;
+    if (!localPlayer || !this.spikeBallAvailable) return;
 
-    // Mark axe as unavailable
-    this.axeAvailable = false;
+    // Mark spike ball as unavailable
+    this.spikeBallAvailable = false;
 
-    // Hide player's held axe
-    const heldAxe = localPlayer.children.find(child => child.userData.isAxe);
-    if (heldAxe) {
-      heldAxe.visible = false;
+    // Hide player's held spike ball
+    const heldBall = localPlayer.children.find(child => child.userData.isSpikeBall);
+    if (heldBall) {
+      heldBall.visible = false;
     }
 
-    // Get throw direction from camera
-    const direction = new THREE.Vector3();
-    this.camera.getWorldDirection(direction);
+    // Get throw direction from player rotation (character forward)
+    const direction = new THREE.Vector3(
+      Math.sin(localPlayer.rotation.y),
+      0.1, // Slight upward angle
+      Math.cos(localPlayer.rotation.y)
+    );
+    direction.normalize();
 
-    // Create flying axe
-    const flyingAxe = this.createAxeMesh();
-    flyingAxe.position.copy(localPlayer.position);
-    flyingAxe.position.y += 0.5; // Center height
-    this.scene.add(flyingAxe);
+    // Create flying spike ball
+    const flyingBall = this.createSpikeBallMesh();
+    flyingBall.position.copy(localPlayer.position);
+    flyingBall.position.y += 0.5; // Center height
+    this.scene.add(flyingBall);
 
-    // Store axe data
-    const axeData = {
-      mesh: flyingAxe,
+    // Store spike ball data
+    const ballData = {
+      mesh: flyingBall,
       direction: direction.clone(),
       startPos: localPlayer.position.clone(),
       distanceTraveled: 0,
@@ -904,63 +927,67 @@ class Game {
       playerId: this.localPlayerId,
       rotation: 0
     };
-    this.axes.set(this.localPlayerId, axeData);
+    this.spikeBalls.set(this.localPlayerId, ballData);
 
-    console.log('🪓 Threw axe');
+    console.log('⚫ Threw spike ball');
   }
 
-  updateAxes() {
-    this.axes.forEach((axeData, playerId) => {
+  updateSpikeBalls() {
+    this.spikeBalls.forEach((ballData, playerId) => {
       const player = this.players.get(playerId);
       if (!player) return;
 
-      const speed = 0.5; // Axe speed
-      const rotationSpeed = 0.3; // Rotation speed
+      const speed = 0.5; // Ball speed
+      const rotationSpeed = 0.2; // Rotation speed
 
-      if (!axeData.returning) {
+      if (!ballData.returning) {
         // Flying forward
-        axeData.mesh.position.add(axeData.direction.clone().multiplyScalar(speed));
-        axeData.distanceTraveled += speed;
+        ballData.mesh.position.add(ballData.direction.clone().multiplyScalar(speed));
+        ballData.distanceTraveled += speed;
 
-        // Rotate axe
-        axeData.rotation += rotationSpeed;
-        axeData.mesh.rotation.x = axeData.rotation;
+        // Rotate spike ball on all axes
+        ballData.rotation += rotationSpeed;
+        ballData.mesh.rotation.x = ballData.rotation;
+        ballData.mesh.rotation.y = ballData.rotation * 0.7;
+        ballData.mesh.rotation.z = ballData.rotation * 0.5;
 
         // Start returning after max distance
-        if (axeData.distanceTraveled >= axeData.maxDistance) {
-          axeData.returning = true;
+        if (ballData.distanceTraveled >= ballData.maxDistance) {
+          ballData.returning = true;
         }
       } else {
         // Returning to player
         const directionToPlayer = new THREE.Vector3();
-        directionToPlayer.subVectors(player.position, axeData.mesh.position);
+        directionToPlayer.subVectors(player.position, ballData.mesh.position);
         const distance = directionToPlayer.length();
 
         if (distance < 1) {
-          // Axe returned - remove flying axe
-          this.scene.remove(axeData.mesh);
-          this.axes.delete(playerId);
+          // Ball returned - remove flying ball
+          this.scene.remove(ballData.mesh);
+          this.spikeBalls.delete(playerId);
 
-          // Show held axe again
-          const heldAxe = player.children.find(child => child.userData.isAxe);
-          if (heldAxe) {
-            heldAxe.visible = true;
+          // Show held ball again
+          const heldBall = player.children.find(child => child.userData.isSpikeBall);
+          if (heldBall) {
+            heldBall.visible = true;
           }
 
-          // Make axe available again
+          // Make spike ball available again
           if (playerId === this.localPlayerId) {
-            this.axeAvailable = true;
+            this.spikeBallAvailable = true;
           }
 
-          console.log('🪓 Axe returned');
+          console.log('⚫ Spike ball returned');
         } else {
           // Move towards player
           directionToPlayer.normalize();
-          axeData.mesh.position.add(directionToPlayer.multiplyScalar(speed));
+          ballData.mesh.position.add(directionToPlayer.multiplyScalar(speed));
 
-          // Rotate axe
-          axeData.rotation += rotationSpeed;
-          axeData.mesh.rotation.x = axeData.rotation;
+          // Rotate spike ball
+          ballData.rotation += rotationSpeed;
+          ballData.mesh.rotation.x = ballData.rotation;
+          ballData.mesh.rotation.y = ballData.rotation * 0.7;
+          ballData.mesh.rotation.z = ballData.rotation * 0.5;
         }
       }
     });
@@ -1029,7 +1056,7 @@ class Game {
       ui.updateDashGauge(dashCooldown, this.config.dashCooldown, dashStacks, this.config.maxDashStacks);
     }
 
-    this.updateAxes();
+    this.updateSpikeBalls();
     this.updateCamera();
     this.renderer.render(this.scene, this.camera);
     ui.updateFPS();
