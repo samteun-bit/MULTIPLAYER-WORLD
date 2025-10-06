@@ -707,19 +707,49 @@ class Game {
       oldBubble.material.dispose();
     }
 
-    // Create chat bubble canvas
+    // Create temporary canvas for text measurement
+    const tempCanvas = document.createElement('canvas');
+    const tempContext = tempCanvas.getContext('2d');
+    tempContext.font = 'Bold 28px Arial';
+
+    // Word wrap calculation
+    const maxWidth = 450; // Max width for text
+    const words = message.split(' ');
+    let lines = [];
+    let currentLine = words[0] || '';
+
+    for (let i = 1; i < words.length; i++) {
+      const testLine = currentLine + ' ' + words[i];
+      const metrics = tempContext.measureText(testLine);
+      if (metrics.width > maxWidth) {
+        lines.push(currentLine);
+        currentLine = words[i];
+      } else {
+        currentLine = testLine;
+      }
+    }
+    lines.push(currentLine);
+
+    // Calculate dynamic canvas size
+    const lineHeight = 36;
+    const padding = 20;
+    const canvasWidth = 512;
+    const textHeight = lines.length * lineHeight;
+    const canvasHeight = Math.max(80, textHeight + padding * 2 + 20); // Min 80, dynamic based on lines
+
+    // Create actual canvas with dynamic height
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
-    canvas.width = 512;
-    canvas.height = 128;
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
 
     // Draw speech bubble background
     context.fillStyle = 'rgba(255, 255, 255, 0.95)';
     context.strokeStyle = 'rgba(0, 0, 0, 0.8)';
     context.lineWidth = 3;
 
-    // Rounded rectangle
-    const x = 20, y = 20, w = canvas.width - 40, h = canvas.height - 40, r = 15;
+    // Rounded rectangle with dynamic size
+    const x = 15, y = 15, w = canvas.width - 30, h = canvas.height - 30, r = 15;
     context.beginPath();
     context.moveTo(x + r, y);
     context.lineTo(x + w - r, y);
@@ -740,26 +770,7 @@ class Game {
     context.textAlign = 'center';
     context.textBaseline = 'middle';
 
-    // Word wrap
-    const maxWidth = w - 20;
-    const words = message.split(' ');
-    let lines = [];
-    let currentLine = words[0];
-
-    for (let i = 1; i < words.length; i++) {
-      const testLine = currentLine + ' ' + words[i];
-      const metrics = context.measureText(testLine);
-      if (metrics.width > maxWidth) {
-        lines.push(currentLine);
-        currentLine = words[i];
-      } else {
-        currentLine = testLine;
-      }
-    }
-    lines.push(currentLine);
-
-    // Draw lines
-    const lineHeight = 32;
+    // Draw lines centered vertically
     const startY = canvas.height / 2 - (lines.length - 1) * lineHeight / 2;
     lines.forEach((line, i) => {
       context.fillText(line, canvas.width / 2, startY + i * lineHeight);
@@ -768,7 +779,10 @@ class Game {
     const texture = new THREE.CanvasTexture(canvas);
     const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
     const sprite = new THREE.Sprite(spriteMaterial);
-    sprite.scale.set(4, 1, 1);
+
+    // Dynamic sprite size based on canvas aspect ratio
+    const aspectRatio = canvasHeight / canvasWidth;
+    sprite.scale.set(4, 4 * aspectRatio, 1);
     sprite.position.y = 2.5;
     sprite.userData.isChatBubble = true;
     mesh.add(sprite);
