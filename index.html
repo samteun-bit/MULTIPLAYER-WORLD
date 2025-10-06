@@ -315,6 +315,50 @@
     #chat-input::placeholder {
       color: rgba(255, 255, 255, 0.5);
     }
+
+    /* Crosshair */
+    #crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px;
+      height: 20px;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .crosshair-line {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    .crosshair-horizontal {
+      width: 20px;
+      height: 2px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .crosshair-vertical {
+      width: 2px;
+      height: 20px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .crosshair-dot {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
   </style>
 </head>
 <body>
@@ -360,6 +404,13 @@
       <!-- Chat Input -->
       <div id="chat-input-container">
         <input type="text" id="chat-input" placeholder="Press Enter to chat..." autocomplete="off">
+      </div>
+
+      <!-- Crosshair -->
+      <div id="crosshair">
+        <div class="crosshair-line crosshair-horizontal"></div>
+        <div class="crosshair-line crosshair-vertical"></div>
+        <div class="crosshair-dot"></div>
       </div>
     </div>
 

@@ -23,8 +23,12 @@ class Game {
       left: false,
       right: false,
       jump: false,
-      dash: false
+      dash: false,
+      shoot: false
     };
+
+    // Shooting
+    this.bullets = []; // Active bullets in the scene
 
     // Camera
     this.cameraPosition = new THREE.Vector3();
@@ -226,6 +230,11 @@ class Game {
         this.showChatBubble(chatData.playerId, chatData.message);
       });
 
+      this.gameHost.onShoot((shootData) => {
+        console.log('🔫 HOST: Shoot callback:', shootData);
+        this.showShoot(shootData.playerId, shootData.startPos, shootData.direction);
+      });
+
       // Setup host-specific callbacks for rendering (polling backup)
       this.setupHostCallbacks();
     } catch (error) {
@@ -361,6 +370,14 @@ class Game {
         this.showChatBubble(chatData.playerId, chatData.message);
       }
     });
+
+    this.gameClient.onShoot((shootData) => {
+      console.log('🔫 CLIENT: Shoot callback:', shootData);
+      // Don't show own shots again (already shown)
+      if (shootData.playerId !== this.localPlayerId) {
+        this.showShoot(shootData.playerId, shootData.startPos, shootData.direction);
+      }
+    });
   }
 
   onCopyCodeClick() {
@@ -433,6 +450,11 @@ class Game {
         changed = true;
         event.preventDefault();
         break;
+      case 'KeyK':
+        this.keys.shoot = true;
+        this.shoot();
+        event.preventDefault();
+        break;
     }
 
     if (changed) {
@@ -474,6 +496,9 @@ class Game {
       case 'ShiftRight':
         this.keys.dash = false;
         changed = true;
+        break;
+      case 'KeyK':
+        this.keys.shoot = false;
         break;
     }
 
@@ -828,6 +853,79 @@ class Game {
         sprite.material.dispose();
       }
     }, 5000);
+  }
+
+  shoot() {
+    const localPlayer = this.players.get(this.localPlayerId);
+    if (!localPlayer) return;
+
+    // Get shooting direction from camera
+    const direction = new THREE.Vector3();
+    this.camera.getWorldDirection(direction);
+
+    // Bullet start position (from player)
+    const startPos = localPlayer.position.clone();
+    startPos.y += 0.5; // Shoot from center height
+
+    // Create bullet trail (line)
+    const bulletGeometry = new THREE.BufferGeometry();
+    const bulletMaterial = new THREE.LineBasicMaterial({
+      color: 0xffff00,
+      linewidth: 3
+    });
+
+    // Bullet end position (raycast forward)
+    const endPos = startPos.clone().add(direction.multiplyScalar(100));
+
+    bulletGeometry.setFromPoints([startPos, endPos]);
+    const bullet = new THREE.Line(bulletGeometry, bulletMaterial);
+    this.scene.add(bullet);
+
+    // Store bullet with creation time
+    this.bullets.push({
+      line: bullet,
+      createdAt: Date.now()
+    });
+
+    // Remove bullet after 100ms (quick flash)
+    setTimeout(() => {
+      this.scene.remove(bullet);
+      bulletGeometry.dispose();
+      bulletMaterial.dispose();
+      this.bullets = this.bullets.filter(b => b.line !== bullet);
+    }, 100);
+
+    // Broadcast shoot event to other players
+    if (this.isHost && this.gameHost) {
+      this.gameHost.broadcastShoot(this.localPlayerId, startPos, direction);
+    } else if (this.gameClient) {
+      this.gameClient.sendShoot(startPos, direction);
+    }
+  }
+
+  showShoot(playerId, startPos, direction) {
+    // Show other players' shots
+    const bulletGeometry = new THREE.BufferGeometry();
+    const bulletMaterial = new THREE.LineBasicMaterial({
+      color: 0xff0000, // Red for other players
+      linewidth: 3
+    });
+
+    const endPos = startPos.clone().add(direction.multiplyScalar(100));
+    bulletGeometry.setFromPoints([
+      new THREE.Vector3(startPos.x, startPos.y, startPos.z),
+      new THREE.Vector3(endPos.x, endPos.y, endPos.z)
+    ]);
+
+    const bullet = new THREE.Line(bulletGeometry, bulletMaterial);
+    this.scene.add(bullet);
+
+    // Remove after 100ms
+    setTimeout(() => {
+      this.scene.remove(bullet);
+      bulletGeometry.dispose();
+      bulletMaterial.dispose();
+    }, 100);
   }
 
   updateCamera() {
