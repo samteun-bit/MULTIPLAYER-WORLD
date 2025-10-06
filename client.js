@@ -712,23 +712,56 @@ class Game {
     const tempContext = tempCanvas.getContext('2d');
     tempContext.font = 'Bold 28px Arial';
 
-    // Word wrap calculation
+    // Word wrap calculation - handle both word-based and character-based wrapping
     const maxWidth = 450; // Max width for text
-    const words = message.split(' ');
     let lines = [];
-    let currentLine = words[0] || '';
+    let currentLine = '';
 
-    for (let i = 1; i < words.length; i++) {
-      const testLine = currentLine + ' ' + words[i];
+    // Split by words first (for English/spaces)
+    const words = message.split(' ');
+
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+      const testLine = currentLine ? currentLine + ' ' + word : word;
       const metrics = tempContext.measureText(testLine);
+
       if (metrics.width > maxWidth) {
-        lines.push(currentLine);
-        currentLine = words[i];
+        // If current line is not empty, push it first
+        if (currentLine) {
+          lines.push(currentLine);
+          currentLine = '';
+        }
+
+        // Check if single word is too long (needs character wrapping)
+        const wordMetrics = tempContext.measureText(word);
+        if (wordMetrics.width > maxWidth) {
+          // Character-by-character wrapping for long words (Korean, etc)
+          let charLine = '';
+          for (let j = 0; j < word.length; j++) {
+            const char = word[j];
+            const testCharLine = charLine + char;
+            const charMetrics = tempContext.measureText(testCharLine);
+
+            if (charMetrics.width > maxWidth && charLine) {
+              lines.push(charLine);
+              charLine = char;
+            } else {
+              charLine = testCharLine;
+            }
+          }
+          currentLine = charLine;
+        } else {
+          // Word fits on its own line
+          currentLine = word;
+        }
       } else {
         currentLine = testLine;
       }
     }
-    lines.push(currentLine);
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
 
     // Calculate dynamic canvas size
     const lineHeight = 36;
