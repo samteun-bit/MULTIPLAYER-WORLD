@@ -119,6 +119,7 @@ class Game {
     // Chat input setup
     const chatInput = document.getElementById('chat-input');
     const chatContainer = document.getElementById('chat-input-container');
+    let isComposing = false; // Track IME composition state
 
     // Enter key to toggle chat
     window.addEventListener('keydown', (e) => {
@@ -137,9 +138,23 @@ class Game {
       }
     });
 
+    // Track IME composition (for Korean, Japanese, Chinese input)
+    chatInput.addEventListener('compositionstart', () => {
+      isComposing = true;
+    });
+
+    chatInput.addEventListener('compositionend', () => {
+      isComposing = false;
+    });
+
     // Send chat message
     chatInput.addEventListener('keydown', (e) => {
       if (e.code === 'Enter') {
+        // Don't send if still composing (Korean/Japanese/Chinese input)
+        if (isComposing) {
+          return;
+        }
+
         e.preventDefault();
         const message = chatInput.value.trim();
         if (message) {
