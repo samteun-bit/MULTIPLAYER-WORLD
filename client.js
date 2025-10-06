@@ -902,10 +902,10 @@ class Game {
       heldBall.visible = false;
     }
 
-    // Get throw direction from player rotation (character forward)
+    // Get throw direction from player rotation (character forward, horizontal)
     const direction = new THREE.Vector3(
       Math.sin(localPlayer.rotation.y),
-      0.1, // Slight upward angle
+      0, // Horizontal throw (no upward angle)
       Math.cos(localPlayer.rotation.y)
     );
     direction.normalize();
@@ -913,7 +913,7 @@ class Game {
     // Create flying spike ball
     const flyingBall = this.createSpikeBallMesh();
     flyingBall.position.copy(localPlayer.position);
-    flyingBall.position.y += 0.5; // Center height
+    flyingBall.position.y = localPlayer.position.y; // Same height as player (lowest possible)
     this.scene.add(flyingBall);
 
     // Store spike ball data
