@@ -115,6 +115,46 @@ class Game {
   setupControls() {
     window.addEventListener('keydown', (e) => this.onKeyDown(e));
     window.addEventListener('keyup', (e) => this.onKeyUp(e));
+
+    // Chat input setup
+    const chatInput = document.getElementById('chat-input');
+    const chatContainer = document.getElementById('chat-input-container');
+
+    // Enter key to toggle chat
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Enter') {
+        if (chatContainer.style.display === 'none' || !chatContainer.style.display) {
+          // Show chat input
+          chatContainer.style.display = 'block';
+          chatInput.focus();
+          e.preventDefault();
+        }
+      } else if (e.code === 'Escape' && chatContainer.style.display === 'block') {
+        // Hide chat on Escape
+        chatContainer.style.display = 'none';
+        chatInput.value = '';
+        chatInput.blur();
+      }
+    });
+
+    // Send chat message
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.code === 'Enter') {
+        e.preventDefault();
+        const message = chatInput.value.trim();
+        if (message) {
+          this.sendChatMessage(message);
+          chatInput.value = '';
+        }
+        chatContainer.style.display = 'none';
+        chatInput.blur();
+      } else if (e.code === 'Escape') {
+        e.preventDefault();
+        chatContainer.style.display = 'none';
+        chatInput.value = '';
+        chatInput.blur();
+      }
+    });
   }
 
   setupUI() {
@@ -242,6 +282,17 @@ class Game {
   }
 
   setupHostCallbacks() {
+    // Set up chat callback for host to receive chat messages
+    this.network.onData((peerId, data) => {
+      if (data.type === 'chat') {
+        console.log('💬 HOST CLIENT: Chat received from', peerId, ':', data.message);
+        // Don't show own messages again (already shown optimistically)
+        if (data.playerId !== this.localPlayerId) {
+          this.showChatBubble(data.playerId, data.message);
+        }
+      }
+    });
+
     // Polling backup for syncing player names and detecting edge cases
     setInterval(() => {
       if (!this.gameHost) return;
@@ -290,6 +341,14 @@ class Game {
       this.removePlayerMesh(playerId);
       ui.removePlayer(playerId);
     });
+
+    this.gameClient.onChatMessage((chatData) => {
+      console.log('💬 CLIENT: Chat callback triggered:', chatData);
+      // Don't show own messages again (already shown optimistically)
+      if (chatData.playerId !== this.localPlayerId) {
+        this.showChatBubble(chatData.playerId, chatData.message);
+      }
+    });
   }
 
   onCopyCodeClick() {
@@ -304,6 +363,12 @@ class Game {
   }
 
   onKeyDown(event) {
+    // Don't process game input when chat is open
+    const chatContainer = document.getElementById('chat-input-container');
+    if (chatContainer && chatContainer.style.display === 'block') {
+      return;
+    }
+
     let changed = false;
 
     switch (event.code) {
@@ -549,8 +614,8 @@ class Game {
   }
 
   updatePlayerNameTag(mesh, newName) {
-    // Find and remove old sprite
-    const oldSprite = mesh.children.find(child => child instanceof THREE.Sprite);
+    // Find and remove old name tag sprite (but keep chat bubbles)
+    const oldSprite = mesh.children.find(child => child instanceof THREE.Sprite && child.userData.isNameTag);
     if (oldSprite) {
       mesh.remove(oldSprite);
       oldSprite.material.map.dispose();
@@ -577,7 +642,115 @@ class Game {
     const sprite = new THREE.Sprite(spriteMaterial);
     sprite.scale.set(2, 0.5, 1);
     sprite.position.y = 1.5;
+    sprite.userData.isNameTag = true;
     mesh.add(sprite);
+  }
+
+  sendChatMessage(message) {
+    const chatData = {
+      playerId: this.localPlayerId,
+      message: message,
+      timestamp: Date.now()
+    };
+
+    // Send via network
+    if (this.isHost && this.gameHost) {
+      this.gameHost.broadcastChatMessage(chatData);
+      // Show locally
+      this.showChatBubble(this.localPlayerId, message);
+    } else if (this.gameClient) {
+      this.gameClient.sendChatMessage(chatData);
+      // Show locally (optimistic)
+      this.showChatBubble(this.localPlayerId, message);
+    }
+  }
+
+  showChatBubble(playerId, message) {
+    const mesh = this.players.get(playerId);
+    if (!mesh) return;
+
+    // Remove existing chat bubble if any
+    const oldBubble = mesh.children.find(child => child.userData.isChatBubble);
+    if (oldBubble) {
+      mesh.remove(oldBubble);
+      if (oldBubble.material.map) oldBubble.material.map.dispose();
+      oldBubble.material.dispose();
+    }
+
+    // Create chat bubble canvas
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = 512;
+    canvas.height = 128;
+
+    // Draw speech bubble background
+    context.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    context.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+    context.lineWidth = 3;
+
+    // Rounded rectangle
+    const x = 20, y = 20, w = canvas.width - 40, h = canvas.height - 40, r = 15;
+    context.beginPath();
+    context.moveTo(x + r, y);
+    context.lineTo(x + w - r, y);
+    context.quadraticCurveTo(x + w, y, x + w, y + r);
+    context.lineTo(x + w, y + h - r);
+    context.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    context.lineTo(x + r, y + h);
+    context.quadraticCurveTo(x, y + h, x, y + h - r);
+    context.lineTo(x, y + r);
+    context.quadraticCurveTo(x, y, x + r, y);
+    context.closePath();
+    context.fill();
+    context.stroke();
+
+    // Draw text
+    context.font = 'Bold 28px Arial';
+    context.fillStyle = 'black';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+
+    // Word wrap
+    const maxWidth = w - 20;
+    const words = message.split(' ');
+    let lines = [];
+    let currentLine = words[0];
+
+    for (let i = 1; i < words.length; i++) {
+      const testLine = currentLine + ' ' + words[i];
+      const metrics = context.measureText(testLine);
+      if (metrics.width > maxWidth) {
+        lines.push(currentLine);
+        currentLine = words[i];
+      } else {
+        currentLine = testLine;
+      }
+    }
+    lines.push(currentLine);
+
+    // Draw lines
+    const lineHeight = 32;
+    const startY = canvas.height / 2 - (lines.length - 1) * lineHeight / 2;
+    lines.forEach((line, i) => {
+      context.fillText(line, canvas.width / 2, startY + i * lineHeight);
+    });
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+    const sprite = new THREE.Sprite(spriteMaterial);
+    sprite.scale.set(4, 1, 1);
+    sprite.position.y = 2.5;
+    sprite.userData.isChatBubble = true;
+    mesh.add(sprite);
+
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      if (mesh.children.includes(sprite)) {
+        mesh.remove(sprite);
+        if (sprite.material.map) sprite.material.map.dispose();
+        sprite.material.dispose();
+      }
+    }, 5000);
   }
 
   updateCamera() {

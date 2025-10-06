@@ -16,7 +16,8 @@ class GameClient {
       onInit: null,
       onGameState: null,
       onPlayerJoined: null,
-      onPlayerLeft: null
+      onPlayerLeft: null,
+      onChatMessage: null
     };
 
     this.setupNetworking();
@@ -107,6 +108,13 @@ class GameClient {
           console.log('🎮 CLIENT: Player left:', data.playerId);
           if (this.callbacks.onPlayerLeft) {
             this.callbacks.onPlayerLeft(data.playerId);
+          }
+          break;
+
+        case 'chat':
+          console.log('💬 CLIENT: Received chat from', data.playerId, ':', data.message);
+          if (this.callbacks.onChatMessage) {
+            this.callbacks.onChatMessage(data);
           }
           break;
       }
@@ -270,5 +278,19 @@ class GameClient {
 
   onPlayerLeft(callback) {
     this.callbacks.onPlayerLeft = callback;
+  }
+
+  onChatMessage(callback) {
+    this.callbacks.onChatMessage = callback;
+  }
+
+  sendChatMessage(chatData) {
+    // Send chat message to host
+    this.network.sendToHost({
+      type: 'chat',
+      playerId: chatData.playerId,
+      message: chatData.message,
+      timestamp: chatData.timestamp
+    });
   }
 }

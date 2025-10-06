@@ -57,6 +57,15 @@ class GameHost {
           player.name = data.name;
           console.log('📝 Updated player name:', peerId, data.name);
         }
+      } else if (data.type === 'chat') {
+        // Broadcast chat message to all clients
+        console.log('💬 HOST: Received chat from', peerId, ':', data.message);
+        this.network.send({
+          type: 'chat',
+          playerId: data.playerId,
+          message: data.message,
+          timestamp: data.timestamp
+        });
       }
     });
   }
@@ -345,5 +354,16 @@ class GameHost {
       0x00ffff, 0xff8800, 0x8800ff, 0x00ff88, 0xff0088
     ];
     return colors[Math.floor(Math.random() * colors.length)];
+  }
+
+  broadcastChatMessage(chatData) {
+    // Host broadcasts their own chat message to all clients
+    console.log('💬 HOST: Broadcasting own chat:', chatData.message);
+    this.network.send({
+      type: 'chat',
+      playerId: chatData.playerId,
+      message: chatData.message,
+      timestamp: chatData.timestamp
+    });
   }
 }

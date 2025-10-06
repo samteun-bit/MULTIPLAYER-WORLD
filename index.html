@@ -283,6 +283,38 @@
     ::-webkit-scrollbar-thumb:hover {
       background: rgba(255, 255, 255, 0.5);
     }
+
+    /* Chat Input */
+    #chat-input-container {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 400px;
+      max-width: 80%;
+      display: none;
+      pointer-events: auto;
+    }
+
+    #chat-input {
+      width: 100%;
+      padding: 12px 15px;
+      font-size: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      outline: none;
+    }
+
+    #chat-input:focus {
+      border-color: #00ffff;
+      box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+    }
+
+    #chat-input::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
   </style>
 </head>
 <body>
@@ -323,6 +355,11 @@
         <div id="dash-gauge-container">
           <div id="dash-gauge-fill" style="width: 0%;"></div>
         </div>
+      </div>
+
+      <!-- Chat Input -->
+      <div id="chat-input-container">
+        <input type="text" id="chat-input" placeholder="Press Enter to chat..." maxlength="100" autocomplete="off">
       </div>
     </div>
 
