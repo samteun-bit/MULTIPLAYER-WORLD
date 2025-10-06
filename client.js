@@ -369,6 +369,18 @@ class Game {
       return;
     }
 
+    // C key to toggle controls panel
+    if (event.code === 'KeyC') {
+      const controlsPanel = document.getElementById('controls-panel');
+      if (controlsPanel.style.display === 'none') {
+        controlsPanel.style.display = 'block';
+      } else {
+        controlsPanel.style.display = 'none';
+      }
+      event.preventDefault();
+      return;
+    }
+
     let changed = false;
 
     switch (event.code) {
