@@ -116,13 +116,16 @@ class GameHost {
 
     // Send initial state to the new player (if not host)
     if (peerId !== this.network.peerId) {
+      const playersList = Array.from(this.players.values());
       const initData = {
         type: 'init',
         localPlayerId: peerId,
         config: this.config,
-        players: Array.from(this.players.values())
+        players: playersList
       };
-      console.log('📤 HOST: Sending init data to', peerId, initData);
+      console.log('📤 HOST: Sending init data to', peerId);
+      console.log('📊 HOST: Current players in init:', playersList.map(p => p.id));
+      console.log('📦 HOST: Full init data:', initData);
       this.network.sendTo(peerId, initData);
 
       // Broadcast to all clients that a new player joined
@@ -150,9 +153,12 @@ class GameHost {
 
   removePlayer(peerId) {
     console.log('🗑️ HOST: Removing player:', peerId);
+    console.log('📊 HOST: Players before removal:', Array.from(this.players.keys()));
 
     this.players.delete(peerId);
     this.inputs.delete(peerId);
+
+    console.log('📊 HOST: Players after removal:', Array.from(this.players.keys()));
 
     // Broadcast to all clients (including self as host)
     const removeMessage = {

@@ -122,11 +122,16 @@ class NetworkManager {
   cleanupConnection(peerId) {
     const wasConnected = this.connections.has(peerId);
 
+    console.log('🧹 NETWORK: cleanupConnection called for:', peerId, 'wasConnected:', wasConnected);
+
     this.connections.delete(peerId);
     this.lastHeartbeat.delete(peerId);
 
     if (wasConnected && this.handlers.onDisconnect) {
+      console.log('🔔 NETWORK: Calling onDisconnect handler for:', peerId);
       this.handlers.onDisconnect(peerId);
+    } else {
+      console.log('⚠️ NETWORK: No handler or already disconnected:', peerId);
     }
   }
 
@@ -160,9 +165,12 @@ class NetworkManager {
       const now = Date.now();
       const timeout = 10000; // 10 seconds timeout
 
+      console.log('💓 HEARTBEAT CHECK: Active connections:', this.connections.size);
       this.lastHeartbeat.forEach((lastTime, peerId) => {
-        if (now - lastTime > timeout) {
-          console.log('💀 Heartbeat timeout for:', peerId);
+        const timeSinceLastBeat = now - lastTime;
+        console.log('💓 Peer:', peerId, 'Last beat:', timeSinceLastBeat + 'ms ago');
+        if (timeSinceLastBeat > timeout) {
+          console.log('💀 Heartbeat timeout for:', peerId, '(', timeSinceLastBeat, 'ms)');
           this.cleanupConnection(peerId);
         }
       });
