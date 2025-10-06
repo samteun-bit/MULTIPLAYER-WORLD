@@ -10,6 +10,11 @@ class NetworkManager {
     this.connections = new Map(); // peerId -> DataConnection
     this.hostConnection = null; // For clients: connection to host
 
+    // Heartbeat tracking
+    this.lastHeartbeat = new Map(); // peerId -> timestamp
+    this.heartbeatInterval = null;
+    this.heartbeatCheckInterval = null;
+
     // Event handlers
     this.handlers = {
       onConnect: null,
@@ -62,6 +67,7 @@ class NetworkManager {
     conn.on('open', () => {
       console.log('✅ Connection opened with:', conn.peer);
       this.connections.set(conn.peer, conn);
+      this.lastHeartbeat.set(conn.peer, Date.now());
 
       if (this.handlers.onConnect) {
         this.handlers.onConnect(conn.peer);
@@ -70,6 +76,19 @@ class NetworkManager {
 
     // Handle incoming data
     conn.on('data', (data) => {
+      // Update heartbeat timestamp for any received data
+      this.lastHeartbeat.set(conn.peer, Date.now());
+
+      // Handle ping/pong
+      if (data.type === 'ping') {
+        // Client responds to host's ping
+        conn.send({ type: 'pong' });
+        return;
+      } else if (data.type === 'pong') {
+        // Host receives pong from client
+        return;
+      }
+
       if (this.handlers.onData) {
         this.handlers.onData(conn.peer, data);
       }
@@ -78,30 +97,19 @@ class NetworkManager {
     // Handle disconnection
     conn.on('close', () => {
       console.log('❌ Connection closed:', conn.peer);
-      this.connections.delete(conn.peer);
-
-      if (this.handlers.onDisconnect) {
-        this.handlers.onDisconnect(conn.peer);
-      }
+      this.cleanupConnection(conn.peer);
     });
 
     conn.on('error', (error) => {
       console.error('❌ Connection error with', conn.peer, ':', error);
-      // Also trigger disconnect on error
-      this.connections.delete(conn.peer);
-      if (this.handlers.onDisconnect) {
-        this.handlers.onDisconnect(conn.peer);
-      }
+      this.cleanupConnection(conn.peer);
     });
 
     // Check connection status periodically (for detecting disconnects)
     const checkInterval = setInterval(() => {
       if (!conn.open && this.connections.has(conn.peer)) {
         console.log('⚠️ Detected closed connection:', conn.peer);
-        this.connections.delete(conn.peer);
-        if (this.handlers.onDisconnect) {
-          this.handlers.onDisconnect(conn.peer);
-        }
+        this.cleanupConnection(conn.peer);
         clearInterval(checkInterval);
       }
     }, 1000);
@@ -110,13 +118,69 @@ class NetworkManager {
     conn._checkInterval = checkInterval;
   }
 
+  // Cleanup connection and notify disconnect
+  cleanupConnection(peerId) {
+    const wasConnected = this.connections.has(peerId);
+
+    this.connections.delete(peerId);
+    this.lastHeartbeat.delete(peerId);
+
+    if (wasConnected && this.handlers.onDisconnect) {
+      this.handlers.onDisconnect(peerId);
+    }
+  }
+
   // Create room (become host)
   async createRoom() {
     this.isHost = true;
     this.roomId = this.peerId; // Use Peer ID as room code
 
+    // Start heartbeat system for host
+    this.startHeartbeat();
+
     console.log('🏠 Room created:', this.roomId);
     return this.roomId;
+  }
+
+  // Start heartbeat system (host only)
+  startHeartbeat() {
+    if (!this.isHost) return;
+
+    // Send ping to all clients every 3 seconds
+    this.heartbeatInterval = setInterval(() => {
+      this.connections.forEach((conn, peerId) => {
+        if (conn.open) {
+          conn.send({ type: 'ping' });
+        }
+      });
+    }, 3000);
+
+    // Check for dead connections every 5 seconds
+    this.heartbeatCheckInterval = setInterval(() => {
+      const now = Date.now();
+      const timeout = 10000; // 10 seconds timeout
+
+      this.lastHeartbeat.forEach((lastTime, peerId) => {
+        if (now - lastTime > timeout) {
+          console.log('💀 Heartbeat timeout for:', peerId);
+          this.cleanupConnection(peerId);
+        }
+      });
+    }, 5000);
+
+    console.log('💓 Heartbeat system started');
+  }
+
+  // Stop heartbeat system
+  stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+    if (this.heartbeatCheckInterval) {
+      clearInterval(this.heartbeatCheckInterval);
+      this.heartbeatCheckInterval = null;
+    }
   }
 
   // Join room (become client)
@@ -207,6 +271,9 @@ class NetworkManager {
 
   // Cleanup
   destroy() {
+    // Stop heartbeat
+    this.stopHeartbeat();
+
     this.connections.forEach(conn => {
       if (conn._checkInterval) {
         clearInterval(conn._checkInterval);
@@ -214,6 +281,7 @@ class NetworkManager {
       conn.close();
     });
     this.connections.clear();
+    this.lastHeartbeat.clear();
 
     if (this.hostConnection) {
       if (this.hostConnection._checkInterval) {
