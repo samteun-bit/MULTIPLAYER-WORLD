@@ -62,7 +62,6 @@ const CONFIG = {
       { key: 'Shift', action: 'Dash' },
       { key: 'P', action: 'Rotate Camera 90° ↺ (CCW)' },
       { key: 'O', action: 'Rotate Camera 90° ↻ (CW)' },
-      { key: 'K', action: 'Shoot' },
       { key: 'Enter', action: 'Open/Send Chat' },
       { key: 'C', action: 'Toggle Controls Panel' }
     ]

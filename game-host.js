@@ -26,7 +26,6 @@ class GameHost {
     this.onPlayerAddedCallback = null;
     this.onPlayerRemovedCallback = null;
     this.onChatMessageCallback = null;
-    this.onShootCallback = null;
 
     this.setupNetworking();
   }
@@ -75,20 +74,6 @@ class GameHost {
         // Show on host's screen too (if not own message)
         if (this.onChatMessageCallback && data.playerId !== this.network.peerId) {
           this.onChatMessageCallback(data);
-        }
-      } else if (data.type === 'shoot') {
-        // Broadcast shoot event to all clients
-        console.log('🔫 HOST: Received shoot from', peerId);
-        this.network.send({
-          type: 'shoot',
-          playerId: data.playerId,
-          startPos: data.startPos,
-          direction: data.direction
-        });
-
-        // Show on host's screen too (if not own shot)
-        if (this.onShootCallback && data.playerId !== this.network.peerId) {
-          this.onShootCallback(data);
         }
       }
     });
@@ -191,10 +176,6 @@ class GameHost {
 
   onChatMessage(callback) {
     this.onChatMessageCallback = callback;
-  }
-
-  onShoot(callback) {
-    this.onShootCallback = callback;
   }
 
   removePlayer(peerId) {
@@ -396,16 +377,6 @@ class GameHost {
       playerId: chatData.playerId,
       message: chatData.message,
       timestamp: chatData.timestamp
-    });
-  }
-
-  broadcastShoot(playerId, startPos, direction) {
-    // Broadcast shoot event to all clients
-    this.network.send({
-      type: 'shoot',
-      playerId: playerId,
-      startPos: { x: startPos.x, y: startPos.y, z: startPos.z },
-      direction: { x: direction.x, y: direction.y, z: direction.z }
     });
   }
 }

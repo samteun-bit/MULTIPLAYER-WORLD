@@ -17,8 +17,7 @@ class GameClient {
       onGameState: null,
       onPlayerJoined: null,
       onPlayerLeft: null,
-      onChatMessage: null,
-      onShoot: null
+      onChatMessage: null
     };
 
     this.setupNetworking();
@@ -116,13 +115,6 @@ class GameClient {
           console.log('💬 CLIENT: Received chat from', data.playerId, ':', data.message);
           if (this.callbacks.onChatMessage) {
             this.callbacks.onChatMessage(data);
-          }
-          break;
-
-        case 'shoot':
-          console.log('🔫 CLIENT: Received shoot from', data.playerId);
-          if (this.callbacks.onShoot) {
-            this.callbacks.onShoot(data);
           }
           break;
       }
@@ -300,20 +292,6 @@ class GameClient {
       playerId: chatData.playerId,
       message: chatData.message,
       timestamp: chatData.timestamp
-    });
-  }
-
-  onShoot(callback) {
-    this.callbacks.onShoot = callback;
-  }
-
-  sendShoot(startPos, direction) {
-    // Send shoot event to host
-    this.network.sendToHost({
-      type: 'shoot',
-      playerId: this.localPlayerId,
-      startPos: { x: startPos.x, y: startPos.y, z: startPos.z },
-      direction: { x: direction.x, y: direction.y, z: direction.z }
     });
   }
 }
