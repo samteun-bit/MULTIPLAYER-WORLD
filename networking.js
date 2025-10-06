@@ -82,13 +82,16 @@ class NetworkManager {
       // Handle ping/pong
       if (data.type === 'ping') {
         // Client responds to host's ping
+        console.log('💓 Received ping from host, sending pong');
         conn.send({ type: 'pong' });
         return;
       } else if (data.type === 'pong') {
         // Host receives pong from client
+        console.log('💓 Received pong from', conn.peer);
         return;
       }
 
+      console.log('📥 Received data from', conn.peer, ':', data.type);
       if (this.handlers.onData) {
         this.handlers.onData(conn.peer, data);
       }
