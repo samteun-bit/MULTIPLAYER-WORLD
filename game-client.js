@@ -126,6 +126,7 @@ class GameClient {
     this.lastInput = input;
 
     // Send to host (P2P)
+    console.log('📤 CLIENT: Sending input to host:', input);
     this.network.sendToHost({
       type: 'input',
       input: input

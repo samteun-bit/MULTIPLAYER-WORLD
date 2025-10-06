@@ -49,6 +49,9 @@ class GameHost {
         const input = this.inputs.get(peerId);
         if (input) {
           Object.assign(input, data.input);
+          console.log('🎮 HOST: Received input from', peerId, ':', data.input);
+        } else {
+          console.warn('⚠️ HOST: No input object for peer', peerId);
         }
       } else if (data.type === 'playerInfo') {
         // Update player name

@@ -429,6 +429,12 @@ class Game {
   }
 
   onKeyUp(event) {
+    // Don't process game input when chat is open
+    const chatContainer = document.getElementById('chat-input-container');
+    if (chatContainer && chatContainer.style.display === 'block') {
+      return;
+    }
+
     let changed = false;
 
     switch (event.code) {
