@@ -153,14 +153,20 @@ class Game {
       console.log('🎮 Creating GameHost immediately on host click');
       this.gameHost = new GameHost(this.network, playerName);
 
-      // Set callback for when players are added
+      // Set callbacks for when players are added/removed
       this.gameHost.onPlayerAdded((player) => {
         console.log('🎨 Rendering new player:', player.id);
         this.createPlayerMesh(player);
         ui.updatePlayer(player);
       });
 
-      // Setup host-specific callbacks for rendering
+      this.gameHost.onPlayerRemoved((peerId) => {
+        console.log('🎨 Cleaning up removed player:', peerId);
+        this.removePlayerMesh(peerId);
+        ui.removePlayer(peerId);
+      });
+
+      // Setup host-specific callbacks for rendering (polling backup)
       this.setupHostCallbacks();
     } catch (error) {
       console.error('Failed to create room:', error);
@@ -236,48 +242,22 @@ class Game {
   }
 
   setupHostCallbacks() {
-    // DON'T set onConnect here - game-host.js already handles it
-    // We just need to listen for when players are added to render them
-
-    // Poll for new players and update names
+    // Polling backup for syncing player names and detecting edge cases
     setInterval(() => {
       if (!this.gameHost) return;
 
       const players = this.gameHost.getPlayers();
-      const serverPlayerIds = new Set(players.map(p => p.id));
 
-      // Remove players that are no longer in game state
-      this.players.forEach((mesh, playerId) => {
-        if (!serverPlayerIds.has(playerId)) {
-          console.log('🧹 HOST: Cleaning up disappeared player:', playerId);
-          this.removePlayerMesh(playerId);
-          ui.removePlayer(playerId);
-        }
-      });
-
-      // Add or update existing players
+      // Update player names if changed
       players.forEach(player => {
-        if (!this.players.has(player.id)) {
-          console.log('🆕 New player detected, creating mesh:', player.id);
-          this.createPlayerMesh(player);
+        const mesh = this.players.get(player.id);
+        if (mesh && mesh.userData.playerName !== player.name) {
+          this.updatePlayerNameTag(mesh, player.name);
+          mesh.userData.playerName = player.name;
           ui.updatePlayer(player);
-        } else {
-          // Check if name changed
-          const mesh = this.players.get(player.id);
-          if (mesh && mesh.userData.playerName !== player.name) {
-            this.updatePlayerNameTag(mesh, player.name);
-            mesh.userData.playerName = player.name;
-            ui.updatePlayer(player);
-          }
         }
       });
     }, 100);
-
-    this.network.onDisconnect((peerId) => {
-      console.log('🔌 HOST: onDisconnect triggered for:', peerId);
-      this.removePlayerMesh(peerId);
-      ui.removePlayer(peerId);
-    });
   }
 
   setupClientCallbacks() {

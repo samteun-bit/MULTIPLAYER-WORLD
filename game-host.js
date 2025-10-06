@@ -22,8 +22,9 @@ class GameHost {
     this.lastUpdate = Date.now();
     this.updateInterval = null;
 
-    // Callback for rendering
+    // Callbacks for rendering
     this.onPlayerAddedCallback = null;
+    this.onPlayerRemovedCallback = null;
 
     this.setupNetworking();
   }
@@ -146,9 +147,13 @@ class GameHost {
     return player;
   }
 
-  // Set callback for when players are added
+  // Set callbacks for when players are added/removed
   onPlayerAdded(callback) {
     this.onPlayerAddedCallback = callback;
+  }
+
+  onPlayerRemoved(callback) {
+    this.onPlayerRemovedCallback = callback;
   }
 
   removePlayer(peerId) {
@@ -159,6 +164,12 @@ class GameHost {
     this.inputs.delete(peerId);
 
     console.log('📊 HOST: Players after removal:', Array.from(this.players.keys()));
+
+    // Notify client.js for rendering cleanup
+    if (this.onPlayerRemovedCallback) {
+      console.log('🎨 Calling render cleanup callback for player:', peerId);
+      this.onPlayerRemovedCallback(peerId);
+    }
 
     // Broadcast to all clients (including self as host)
     const removeMessage = {
