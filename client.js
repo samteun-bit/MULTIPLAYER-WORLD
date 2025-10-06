@@ -160,11 +160,8 @@ class Game {
         ui.updatePlayer(player);
       });
 
-      // Setup disconnect handler
-      this.network.onDisconnect((peerId) => {
-        this.removePlayerMesh(peerId);
-        ui.removePlayer(peerId);
-      });
+      // Setup host-specific callbacks for rendering
+      this.setupHostCallbacks();
     } catch (error) {
       console.error('Failed to create room:', error);
       alert('Failed to create room: ' + error.message);
